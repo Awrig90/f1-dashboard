@@ -1,0 +1,170 @@
+{
+  "bahrain_position_disagreements": 369,
+  "sessions": {
+    "2026-Bahrain Grand Prix-Race": {
+      "analyses": {
+        "laps": {
+          "representative-laps": 30,
+          "filter-retention": 1
+        },
+        "drivers": {
+          "representative-laps": 643,
+          "summary": 22,
+          "filter-retention": 22
+        },
+        "teams": {
+          "representative-laps": 643,
+          "summary": 11,
+          "filter-retention": 22
+        },
+        "positions": {
+          "positions": 1142
+        },
+        "strategy": {
+          "stints": 95
+        }
+      },
+      "fastest_comparisons": 22,
+      "lap_retention": {
+        "SourceRows": 1145,
+        "UnambiguousObservedLaps": 1142,
+        "ValidTimedLaps": 1011,
+        "AccurateNonPitLaps": 757,
+        "BeforeQuickCutoff": 658,
+        "RepresentativeLaps": 643
+      }
+    },
+    "2024-Bahrain Grand Prix-Practice 2": {
+      "analyses": {
+        "fastest": {
+          "fastest-laps": 20
+        },
+        "laps": {
+          "representative-laps": 14,
+          "filter-retention": 1
+        },
+        "drivers": {
+          "representative-laps": 198,
+          "summary": 20,
+          "filter-retention": 20
+        },
+        "teams": {
+          "representative-laps": 198,
+          "summary": 10,
+          "filter-retention": 20
+        },
+        "compounds": {
+          "compound-performance": 28,
+          "filter-retention": 20
+        },
+        "sectors": {
+          "sector-performance": 20
+        }
+      },
+      "fastest_comparisons": 20,
+      "lap_retention": {
+        "SourceRows": 511,
+        "UnambiguousObservedLaps": 511,
+        "ValidTimedLaps": 430,
+        "AccurateNonPitLaps": 350,
+        "BeforeQuickCutoff": 350,
+        "RepresentativeLaps": 198
+      },
+      "usage_count_new": 511,
+      "usage_count_old": 430
+    },
+    "2024-Bahrain Grand Prix-Qualifying": {
+      "analyses": {
+        "fastest": {
+          "fastest-laps": 20
+        },
+        "laps": {
+          "representative-laps": 6,
+          "filter-retention": 1
+        },
+        "drivers": {
+          "representative-laps": 83,
+          "summary": 20,
+          "filter-retention": 20
+        },
+        "speed": {
+          "telemetry": 695
+        },
+        "sectors": {
+          "sector-performance": 20
+        }
+      },
+      "fastest_comparisons": 20,
+      "lap_retention": {
+        "SourceRows": 267,
+        "UnambiguousObservedLaps": 267,
+        "ValidTimedLaps": 167,
+        "AccurateNonPitLaps": 83,
+        "BeforeQuickCutoff": 83,
+        "RepresentativeLaps": 83
+      }
+    },
+    "2024-Bahrain Grand Prix-Race": {
+      "analyses": {
+        "laps": {
+          "representative-laps": 49,
+          "filter-retention": 1
+        },
+        "drivers": {
+          "representative-laps": 988,
+          "summary": 20,
+          "filter-retention": 20
+        },
+        "teams": {
+          "representative-laps": 988,
+          "summary": 10,
+          "filter-retention": 20
+        },
+        "positions": "not rerun: feed adapter verified on priority Bahrain case",
+        "strategy": {
+          "stints": 63
+        }
+      },
+      "fastest_comparisons": 20,
+      "lap_retention": {
+        "SourceRows": 1129,
+        "UnambiguousObservedLaps": 1129,
+        "ValidTimedLaps": 1087,
+        "AccurateNonPitLaps": 1005,
+        "BeforeQuickCutoff": 988,
+        "RepresentativeLaps": 988
+      }
+    },
+    "2024-Chinese Grand Prix-Sprint": {
+      "analyses": {
+        "laps": {
+          "representative-laps": 18,
+          "filter-retention": 1
+        },
+        "drivers": {
+          "representative-laps": 353,
+          "summary": 20,
+          "filter-retention": 20
+        },
+        "teams": {
+          "representative-laps": 353,
+          "summary": 10,
+          "filter-retention": 20
+        },
+        "positions": "not rerun: feed adapter verified on priority Bahrain case",
+        "strategy": {
+          "stints": 21
+        }
+      },
+      "fastest_comparisons": 20,
+      "lap_retention": {
+        "SourceRows": 378,
+        "UnambiguousObservedLaps": 378,
+        "ValidTimedLaps": 355,
+        "AccurateNonPitLaps": 353,
+        "BeforeQuickCutoff": 353,
+        "RepresentativeLaps": 353
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.fastf1-cache/
+*.log
+.streamlit/secrets.toml
+demo-exports/
+live-exports/

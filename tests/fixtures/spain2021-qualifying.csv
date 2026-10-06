@@ -1,0 +1,258 @@
+Driver,LapNumber,LapTime,IsPersonalBest,Deleted,FastF1Generated
+VER,1.0,,False,False,False
+VER,2.0,0 days 00:01:18.090000,True,False,False
+VER,3.0,0 days 00:02:18.414000,False,False,False
+VER,4.0,0 days 00:02:02.890000,False,False,False
+VER,5.0,0 days 00:01:26.495000,False,False,False
+VER,6.0,,False,False,False
+VER,7.0,0 days 00:01:16.922000,True,False,False
+VER,8.0,0 days 00:01:37.948000,False,False,False
+VER,9.0,,False,False,False
+VER,10.0,0 days 00:01:16.777000,True,False,False
+VER,11.0,0 days 00:01:30.319000,False,False,False
+VER,12.0,,False,False,False
+VER,13.0,0 days 00:01:16.938000,False,False,False
+VER,14.0,,False,False,False
+HAM,1.0,,False,False,False
+HAM,2.0,0 days 00:01:18.245000,True,False,False
+HAM,3.0,0 days 00:01:54.916000,False,False,False
+HAM,4.0,0 days 00:01:45.247000,False,False,False
+HAM,5.0,0 days 00:01:20.505000,False,False,False
+HAM,6.0,0 days 00:01:40.496000,False,False,False
+HAM,7.0,,False,False,False
+HAM,8.0,,False,False,False
+HAM,9.0,0 days 00:01:17.632000,True,False,False
+HAM,10.0,0 days 00:01:40.710000,False,False,False
+HAM,11.0,,False,False,False
+HAM,12.0,0 days 00:01:17.166000,True,False,False
+HAM,13.0,0 days 00:01:38.986000,False,False,False
+HAM,14.0,,False,False,False
+HAM,15.0,0 days 00:01:16.741000,True,False,False
+HAM,16.0,0 days 00:01:31.357000,False,False,False
+HAM,17.0,,False,False,False
+HAM,18.0,0 days 00:01:17.039000,False,False,False
+HAM,19.0,,False,False,False
+LEC,1.0,,False,False,False
+LEC,2.0,0 days 00:01:18.421000,True,False,False
+LEC,3.0,0 days 00:01:41.526000,False,False,False
+LEC,4.0,,False,False,False
+LEC,5.0,0 days 00:01:18.041000,True,False,False
+LEC,6.0,0 days 00:01:46.249000,False,False,False
+LEC,7.0,,False,False,False
+LEC,8.0,0 days 00:01:17.919000,True,False,False
+LEC,9.0,0 days 00:01:38.467000,False,False,False
+LEC,10.0,,False,False,False
+LEC,11.0,0 days 00:01:17.717000,True,False,False
+LEC,12.0,0 days 00:01:49.475000,False,False,False
+LEC,13.0,,False,False,False
+LEC,14.0,0 days 00:01:17.708000,True,False,False
+LEC,15.0,0 days 00:01:35.921000,False,False,False
+LEC,16.0,,False,False,False
+LEC,17.0,0 days 00:01:17.510000,True,False,False
+LEC,18.0,,False,False,False
+SAI,1.0,,False,False,False
+SAI,2.0,0 days 00:01:18.205000,True,False,False
+SAI,3.0,0 days 00:01:39.262000,False,False,False
+SAI,4.0,,False,False,False
+SAI,5.0,0 days 00:01:17.847000,True,False,False
+SAI,6.0,0 days 00:01:42.992000,False,False,False
+SAI,7.0,,False,False,False
+SAI,8.0,0 days 00:01:17.656000,True,False,False
+SAI,9.0,0 days 00:01:46.856000,False,False,False
+SAI,10.0,,False,False,False
+SAI,11.0,0 days 00:01:17.620000,True,False,False
+SAI,12.0,0 days 00:01:43.391000,False,False,False
+SAI,13.0,,False,False,False
+SAI,14.0,0 days 00:01:17.808000,False,False,False
+SAI,15.0,,False,False,False
+BOT,1.0,,False,False,False
+BOT,2.0,0 days 00:01:18.005000,True,False,False
+BOT,3.0,0 days 00:02:15.727000,False,False,False
+BOT,4.0,0 days 00:01:43.052000,False,False,False
+BOT,5.0,,False,False,False
+BOT,6.0,0 days 00:01:17.400000,True,False,False
+BOT,7.0,0 days 00:01:39.137000,False,False,False
+BOT,8.0,,False,False,False
+BOT,9.0,0 days 00:01:17.142000,True,False,False
+BOT,10.0,0 days 00:01:41.006000,False,False,False
+BOT,11.0,,False,False,False
+BOT,12.0,0 days 00:01:16.873000,True,False,False
+BOT,13.0,0 days 00:01:38.437000,False,False,False
+BOT,14.0,,False,False,False
+BOT,15.0,0 days 00:01:17.134000,False,False,False
+BOT,16.0,,False,False,False
+NOR,1.0,,False,False,False
+NOR,2.0,0 days 00:01:18.806000,True,False,False
+NOR,3.0,0 days 00:01:46.543000,False,False,False
+NOR,4.0,,False,False,False
+NOR,5.0,0 days 00:01:17.821000,True,False,False
+NOR,6.0,0 days 00:01:46.455000,False,False,False
+NOR,7.0,,False,False,False
+NOR,8.0,0 days 00:01:17.696000,True,False,False
+NOR,9.0,0 days 00:01:41.798000,False,False,False
+NOR,10.0,,False,False,False
+NOR,11.0,0 days 00:01:47.832000,False,False,False
+NOR,12.0,,False,False,False
+NOR,13.0,0 days 00:01:18.010000,True,False,False
+NOR,14.0,0 days 00:01:37.485000,False,False,False
+NOR,15.0,,False,False,False
+NOR,16.0,0 days 00:01:18.052000,False,False,False
+NOR,17.0,,False,False,False
+GAS,1.0,,False,False,False
+GAS,2.0,0 days 00:01:18.190000,True,False,False
+GAS,3.0,0 days 00:01:35.474000,False,False,False
+GAS,4.0,,False,False,False
+GAS,5.0,0 days 00:01:17.982000,True,False,False
+GAS,6.0,0 days 00:01:48.774000,False,False,False
+GAS,7.0,,False,False,False
+GAS,8.0,0 days 00:01:18.031000,False,False,False
+GAS,9.0,0 days 00:01:46.730000,False,False,False
+RIC,1.0,,False,False,False
+RIC,2.0,0 days 00:01:18.264000,True,False,False
+RIC,3.0,0 days 00:01:40.852000,False,False,False
+RIC,4.0,,False,False,False
+RIC,5.0,0 days 00:01:18.037000,True,False,False
+RIC,6.0,0 days 00:01:37.296000,False,False,False
+RIC,7.0,,False,False,False
+RIC,8.0,0 days 00:01:17.719000,True,False,False
+RIC,9.0,0 days 00:01:46.204000,False,False,False
+RIC,10.0,,False,False,False
+RIC,11.0,0 days 00:01:17.622000,True,False,False
+RIC,12.0,0 days 00:01:37.985000,False,False,False
+RIC,13.0,,False,False,False
+RIC,14.0,,False,False,False
+RAI,1.0,,False,False,False
+RAI,2.0,0 days 00:01:19.073000,True,False,False
+RAI,3.0,0 days 00:01:46.547000,False,False,False
+RAI,4.0,,False,False,False
+RAI,5.0,0 days 00:01:18.917000,True,False,False
+RAI,6.0,0 days 00:01:44.894000,False,False,False
+PER,1.0,,False,False,False
+PER,2.0,0 days 00:01:18.609000,True,False,False
+PER,3.0,0 days 00:02:04.695000,False,False,False
+PER,4.0,0 days 00:02:15.553000,False,False,False
+PER,5.0,0 days 00:01:18.203000,True,False,False
+PER,6.0,0 days 00:01:47.828000,False,False,False
+PER,7.0,,False,False,False
+PER,8.0,0 days 00:01:18.069000,True,False,False
+PER,9.0,0 days 00:02:09.701000,False,False,False
+PER,10.0,,False,False,False
+PER,11.0,0 days 00:01:17.669000,True,False,False
+PER,12.0,0 days 00:01:41.055000,False,False,False
+PER,13.0,,False,False,False
+PER,14.0,0 days 00:01:36.880000,False,False,False
+PER,15.0,,False,False,False
+PER,16.0,0 days 00:01:17.701000,True,False,False
+PER,17.0,,False,False,False
+ALO,1.0,,False,False,False
+ALO,2.0,0 days 00:01:18.560000,True,False,False
+ALO,3.0,0 days 00:01:49.479000,False,False,False
+ALO,4.0,,False,False,False
+ALO,5.0,0 days 00:01:18.281000,True,False,False
+ALO,6.0,0 days 00:01:43.924000,False,False,False
+ALO,7.0,,False,False,False
+ALO,8.0,0 days 00:01:17.966000,True,False,False
+ALO,9.0,0 days 00:01:45.819000,False,False,False
+ALO,10.0,,False,False,False
+ALO,11.0,0 days 00:01:35.203000,False,False,False
+ALO,12.0,,False,False,False
+ALO,13.0,0 days 00:01:18.526000,True,False,False
+ALO,14.0,0 days 00:01:33.967000,False,False,False
+ALO,15.0,,False,False,False
+ALO,16.0,0 days 00:01:18.147000,True,False,False
+ALO,17.0,,False,False,False
+TSU,1.0,,False,False,False
+TSU,2.0,0 days 00:01:18.648000,True,False,False
+TSU,3.0,0 days 00:02:07.468000,False,False,False
+TSU,4.0,,False,False,False
+TSU,5.0,0 days 00:01:18.556000,True,False,False
+TSU,6.0,0 days 00:02:09.126000,False,False,False
+OCO,1.0,,False,False,False
+OCO,2.0,0 days 00:01:18.281000,True,False,False
+OCO,3.0,0 days 00:01:42.209000,False,False,False
+OCO,4.0,,False,False,False
+OCO,5.0,0 days 00:01:18.041000,True,False,False
+OCO,6.0,0 days 00:01:48.106000,False,False,False
+OCO,7.0,,False,False,False
+OCO,8.0,0 days 00:01:17.743000,True,False,False
+OCO,9.0,0 days 00:01:42.051000,False,False,False
+OCO,10.0,,False,False,False
+OCO,11.0,0 days 00:01:17.580000,True,False,False
+OCO,12.0,0 days 00:01:41.327000,False,False,False
+OCO,13.0,,False,False,False
+OCO,14.0,0 days 00:01:17.868000,False,False,False
+OCO,15.0,,False,False,False
+STR,1.0,,False,False,False
+STR,2.0,0 days 00:01:19.077000,True,False,False
+STR,3.0,0 days 00:01:36.847000,False,False,False
+STR,4.0,,False,False,False
+STR,5.0,0 days 00:01:18.241000,True,False,False
+STR,6.0,0 days 00:01:38.903000,False,False,False
+STR,7.0,,False,False,False
+STR,8.0,0 days 00:01:17.974000,True,False,False
+STR,9.0,0 days 00:01:41.754000,False,False,False
+STR,10.0,,False,False,False
+STR,11.0,0 days 00:01:18.467000,False,False,False
+STR,12.0,0 days 00:01:40.958000,False,False,False
+RUS,1.0,,False,False,False
+RUS,2.0,0 days 00:01:35.607000,False,False,False
+RUS,3.0,,False,False,False
+RUS,4.0,0 days 00:01:18.635000,True,False,False
+RUS,5.0,0 days 00:01:38.760000,False,False,False
+RUS,6.0,,False,False,False
+RUS,7.0,0 days 00:01:18.445000,True,False,False
+RUS,8.0,0 days 00:01:55.144000,False,False,False
+RUS,9.0,,False,False,False
+RUS,10.0,0 days 00:01:19.154000,True,False,False
+RUS,11.0,0 days 00:01:53.500000,False,False,False
+GIO,1.0,,False,False,False
+GIO,2.0,0 days 00:01:19.032000,True,False,False
+GIO,3.0,0 days 00:01:42.886000,False,False,False
+GIO,4.0,,False,False,False
+GIO,5.0,0 days 00:01:18.549000,True,False,False
+GIO,6.0,0 days 00:01:34.754000,False,False,False
+GIO,7.0,,False,False,False
+GIO,8.0,0 days 00:01:19.570000,True,False,False
+GIO,9.0,0 days 00:01:36.541000,False,False,False
+GIO,10.0,,False,False,False
+GIO,11.0,0 days 00:01:18.356000,True,False,False
+GIO,12.0,0 days 00:01:36.888000,False,False,False
+VET,1.0,,False,False,False
+VET,2.0,0 days 00:01:18.895000,True,False,False
+VET,3.0,0 days 00:01:45.294000,False,False,False
+VET,4.0,,False,False,False
+VET,5.0,0 days 00:01:18.289000,True,False,False
+VET,6.0,0 days 00:01:41.950000,False,False,False
+VET,7.0,,False,False,False
+VET,8.0,0 days 00:01:18.079000,True,False,False
+VET,9.0,0 days 00:01:37.981000,False,False,False
+VET,10.0,,False,False,False
+VET,11.0,0 days 00:01:18.096000,False,False,False
+VET,12.0,0 days 00:01:48.805000,False,False,False
+LAT,1.0,,False,False,False
+LAT,2.0,0 days 00:01:20.241000,True,False,False
+LAT,3.0,0 days 00:01:41.003000,False,False,False
+LAT,4.0,,False,False,False
+LAT,5.0,0 days 00:01:19.431000,True,False,False
+LAT,6.0,0 days 00:01:43.862000,False,False,False
+LAT,7.0,,False,False,False
+LAT,8.0,0 days 00:01:19.219000,True,False,False
+LAT,9.0,0 days 00:01:43.343000,False,False,False
+MSC,1.0,,False,False,False
+MSC,2.0,0 days 00:01:20.309000,True,False,False
+MSC,3.0,0 days 00:01:36.456000,False,False,False
+MSC,4.0,,False,False,False
+MSC,5.0,0 days 00:01:19.405000,True,False,False
+MSC,6.0,0 days 00:01:29.913000,False,False,False
+MSC,7.0,,False,False,False
+MSC,8.0,0 days 00:01:19.117000,True,False,False
+MSC,9.0,0 days 00:01:38.708000,False,False,False
+MAZ,1.0,,False,False,False
+MAZ,2.0,0 days 00:01:20.560000,True,False,False
+MAZ,3.0,0 days 00:01:35.009000,False,False,False
+MAZ,4.0,,False,False,False
+MAZ,5.0,0 days 00:01:21.158000,False,False,False
+MAZ,6.0,0 days 00:01:33.855000,False,False,False
+MAZ,7.0,,False,False,False
+MAZ,8.0,0 days 00:01:19.807000,True,False,False
+MAZ,9.0,0 days 00:01:39.897000,False,False,False

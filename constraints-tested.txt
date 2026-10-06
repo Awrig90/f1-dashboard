@@ -1,0 +1,6 @@
+# Validated direct dependency versions on Python 3.12. Not a full transitive lock.
+fastf1==3.8.3
+streamlit==1.65.0
+pandas==2.2.3
+numpy==2.3.5
+matplotlib==3.10.8
