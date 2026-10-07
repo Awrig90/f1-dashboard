@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from f1dash import catalog, processing as p
 from f1dash.charts import generate, png_bytes, PLOT_LOCK
-from f1dash.data import schedule, session_data, fastest_telemetry, reported_positions, roster, precache_weekend, clear_session_cache
+from f1dash.data import schedule, session_snapshot, fastest_telemetry, reported_positions, roster, precache_weekend, current_rss_mb
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('f1dash')
@@ -107,13 +107,12 @@ with st.sidebar:
     if st.button('Refresh session data',help='Clear in-memory caches and refresh on the next load.'):
         st.cache_data.clear()
         st.cache_resource.clear()
-        clear_session_cache()
         old_output = st.session_state.pop('output',None)
         if old_output:
             for fig in old_output.get('_figures',{}).values():
                 plt.close(fig)
     st.caption('FastF1 3.8.3 · 300 dpi PNG exports')
-    st.caption('First loads can be slow. Only the selected session is kept in memory; switching sessions releases the previous one.')
+    st.caption('First loads can be slow. Full FastF1 sessions are released after extracting the chart data needed by the app.')
 
 columns = st.columns([1,2,1.5])
 year = columns[0].selectbox('Season',catalog.seasons(),key='year')
@@ -179,12 +178,18 @@ try:
         if demo:
             from f1dash.demo import demo_session
             session = demo_session(name)
+            data = p.normalize(session.laps)
+            results = pd.DataFrame(session.results)
+            styles = None
         else:
-            session = session_data(year,round_number,name)
-    data = p.normalize(session.laps)
+            snapshot = session_snapshot(year,round_number,name)
+            data = snapshot['data']
+            results = snapshot['results']
+            styles = snapshot.get('styles')
+            session = None
 except p.NoData as exc:
     st.info(str(exc)); st.stop()
-all_drivers, labels = roster(session,data)
+all_drivers, labels = roster(results,data)
 all_teams = sorted(data.Team.dropna().unique().tolist())
 if not all_drivers:
     st.info('No participants have been reported for this session.'); st.stop()
@@ -275,16 +280,24 @@ if st.button('Generate chart',type='primary',disabled=not can_generate):
                     telemetry = demo_telemetry(drivers[0])
                 else:
                     telemetry = fastest_telemetry(year,round_number,name,drivers[0])
+            rss = current_rss_mb()
+            if rss is not None:
+                log.info('Memory before chart generation: %.1f MB RSS', rss)
             with PLOT_LOCK:
                 result = generate(analysis_key,data,context,drivers,teams,options,
-                                  session=None if demo else session,telemetry=telemetry,positions=positions,
-                                  chart_text=chart_text)
+                                  session=session if demo else None,telemetry=telemetry,positions=positions,
+                                  chart_text=chart_text,styles=styles)
                 # Render once at publication/export resolution. The same PNG bytes
                 # are used for the on-screen preview and the immediate download.
-                rendered = {key:png_bytes(fig,dpi=300) for key,fig in result.figures.items()}
-                for fig in result.figures.values():
+                rendered = {}
+                for key, fig in list(result.figures.items()):
+                    rendered[key] = png_bytes(fig,dpi=300)
                     plt.close(fig)
+                result.figures.clear()
                 gc.collect()
+            rss = current_rss_mb()
+            if rss is not None:
+                log.info('Memory after chart render: %.1f MB RSS', rss)
             reported = set()
             for table in result.tables.values():
                 if 'Driver' in table: reported.update(table.Driver.dropna())

@@ -50,3 +50,11 @@ telemetry successfully from its other sources. The app uses the available sessio
   edge cases were covered by deterministic tests; the live sessions above are representative samples, not exhaustive coverage.
 - The UI was exercised with Streamlit AppTest and a live server health check, not a manual cross-browser visual audit.
 - No deployment or GitHub integration was performed.
+## Hosted low-memory follow-up
+
+The original real-session validation above was performed before the hosted memory refactor. The current
+low-memory build keeps the same lap-based calculations, but no longer retains a full FastF1 Session and
+uses a selective raw-stream path for Speed on Track Map. That telemetry path has deterministic unit coverage
+in this package but still needs one live side-by-side regression against the previously validated 2024
+Bahrain qualifying map when deployed somewhere that can reach FastF1.
+

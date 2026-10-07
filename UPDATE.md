@@ -26,16 +26,17 @@ See `docs/AUDIT.md` and `docs/METHODOLOGY.md` for the findings and exact definit
 
 ## Hosted performance / memory update
 
-The first hosted-performance build retained several loaded FastF1 sessions and proved too memory-hungry
-for a 512 MB Render instance. This revision uses a strict low-memory model:
+Two earlier hosted-performance attempts retained full FastF1 Session objects and proved too memory-hungry
+for a 512 MB Render instance. This revision removes that retention entirely:
 
-- at most **one full FastF1 Session** is deliberately retained in process memory;
-- repeated reruns for the same selected session reuse that object;
-- switching session releases the previous object before loading the replacement;
-- **Pre-cache selected weekend** is now disk-only: sessions are loaded sequentially, telemetry disabled, and discarded after their FastF1 cache files are warmed;
-- telemetry is loaded lazily into the currently selected session instead of creating a separate telemetry-keyed Session cache entry;
-- telemetry and reported-position data caches are tightly bounded;
-- charts still render once at 300 dpi and are immediately available through **Download PNG**;
-- **Refresh session data** clears Streamlit data caches and the retained FastF1 session.
+- selected sessions are loaded only long enough to extract a narrow, plain-Pandas analysis snapshot;
+- the full FastF1 Session is then released before any chart is generated;
+- only one lightweight snapshot is kept in Streamlit's data cache;
+- **Pre-cache selected weekend** remains disk-only and disables telemetry, weather and race-control-message loading;
+- Position Tracker reads the reported timing feed without loading another full Session;
+- Speed on Track Map decodes only the chosen driver's car/position samples around the fastest lap rather than loading full-field telemetry;
+- 300 dpi PNG generation and the immediate **Download PNG** workflow are unchanged;
+- Linux deployments request a best-effort heap trim after large data operations and log current RSS around the expensive stages.
 
-These changes do not alter analytical definitions or chart calculations.
+The core lap/sector/strategy calculations are unchanged. The speed-map data path is intentionally different
+for memory reasons and is documented in `docs/METHODOLOGY.md`.

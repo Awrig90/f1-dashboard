@@ -1,10 +1,18 @@
-"""FastF1 boundary: disk cache, one in-process session, lazy telemetry."""
+"""FastF1 boundary: disk cache plus lightweight cached session snapshots.
+
+The hosted app deliberately does not retain a full FastF1 Session object between
+Streamlit reruns. A loaded Session can be surprisingly large relative to a
+512 MB host. We extract only the chart inputs we need, then release the Session.
+"""
+from __future__ import annotations
+
+import ctypes
 import gc
 import logging
 import os
 from pathlib import Path
-from threading import RLock
 
+import numpy as np
 import pandas as pd
 import fastf1
 import streamlit as st
@@ -16,15 +24,36 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 fastf1.Cache.enable_cache(str(CACHE_DIR))
 log = logging.getLogger(__name__)
 
-# Keep exactly one loaded FastF1 Session object in this Python process. This is
-# intentionally separate from Streamlit's resource cache: small hosts (notably
-# 512 MB instances) cannot safely retain several full weekend sessions at once.
-_SESSION_LOCK = RLock()
-_CURRENT_SESSION = {
-    'key': None,
-    'session': None,
-    'telemetry_loaded': False,
-}
+# Only keep fields that the current visualisations/exports actually use.
+RESULT_COLUMNS = ('Abbreviation', 'FullName', 'DriverNumber', 'TeamName')
+
+
+def current_rss_mb():
+    """Best-effort current process RSS for Render diagnostics."""
+    try:
+        with open('/proc/self/status', 'r', encoding='utf-8') as handle:
+            for line in handle:
+                if line.startswith('VmRSS:'):
+                    return float(line.split()[1]) / 1024.0
+    except Exception:
+        return None
+    return None
+
+
+def _release_memory(label=None):
+    """Collect Python objects and, on glibc Linux, return free heap pages to OS."""
+    gc.collect()
+    try:
+        libc = ctypes.CDLL('libc.so.6')
+        trim = getattr(libc, 'malloc_trim', None)
+        if trim is not None:
+            trim(0)
+    except Exception:
+        pass
+    if label:
+        rss = current_rss_mb()
+        if rss is not None:
+            log.info('Memory after %s: %.1f MB RSS', label, rss)
 
 
 @st.cache_data(ttl=3600, max_entries=6, show_spinner=False)
@@ -38,142 +67,293 @@ def schedule(year):
                      'try again, or choose another season.') from exc
 
 
-def _load_new_session(year, round_number, name, telemetry=False):
-    """Create and load one FastF1 session without retaining it globally."""
-    session = fastf1.get_session(year, round_number, name)
-    session.load(telemetry=telemetry, weather=False, messages=True)
-    if session.laps.empty:
-        raise NoData('No lap data is available. The session may not have started, may have '
-                     'been cancelled, or its timing data may not yet be published.')
-    return session
+def _results_frame(session):
+    result = pd.DataFrame(session.results)
+    cols = [c for c in RESULT_COLUMNS if c in result.columns]
+    return result.loc[:, cols].copy().reset_index(drop=True)
 
 
-def _clear_derived_caches():
-    """Drop small session-specific caches when the selected session changes."""
-    for name in ('fastest_telemetry', 'reported_positions'):
-        cached = globals().get(name)
-        clear = getattr(cached, 'clear', None)
-        if clear is not None:
-            clear()
-
-
-def clear_session_cache():
-    """Drop the retained FastF1 Session and its session-specific derived caches."""
-    with _SESSION_LOCK:
-        _CURRENT_SESSION['session'] = None
-        _CURRENT_SESSION['key'] = None
-        _CURRENT_SESSION['telemetry_loaded'] = False
-    _clear_derived_caches()
-    gc.collect()
-
-
-def session_data(year, round_number, name, telemetry=False):
-    """Return the selected session while retaining at most one full Session.
-
-    Repeated reruns for the same selected session reuse the same object. Switching
-    sessions drops the previous object before the replacement is loaded. Telemetry
-    is loaded lazily into that same object rather than creating a second cached
-    copy of the session.
-    """
-    key = (int(year), int(round_number), str(name))
-    with _SESSION_LOCK:
-        try:
-            if _CURRENT_SESSION['key'] != key or _CURRENT_SESSION['session'] is None:
-                _clear_derived_caches()
-                # Release the previous session before loading the replacement so
-                # peak RAM is kept as low as practical on small hosted instances.
-                _CURRENT_SESSION['session'] = None
-                _CURRENT_SESSION['key'] = None
-                _CURRENT_SESSION['telemetry_loaded'] = False
-                gc.collect()
-
-                session = _load_new_session(year, round_number, name, telemetry=False)
-                _CURRENT_SESSION['session'] = session
-                _CURRENT_SESSION['key'] = key
-
-            session = _CURRENT_SESSION['session']
-            if telemetry and not _CURRENT_SESSION['telemetry_loaded']:
-                # FastF1 supports loading the same Session again with telemetry
-                # enabled; this augments the retained object instead of caching a
-                # second full Session keyed by telemetry=True.
-                session.load(telemetry=True, weather=False, messages=True)
-                _CURRENT_SESSION['telemetry_loaded'] = True
-                if session.laps.empty:
-                    raise NoData('No lap data is available. The session may not have started, may have '
-                                 'been cancelled, or its timing data may not yet be published.')
-            return session
-        except NoData:
-            clear_session_cache()
-            raise
-        except Exception as exc:
-            clear_session_cache()
-            log.exception('Session load failed: %s %s %s', year, round_number, name)
-            raise NoData('Session data could not be loaded. Check your connection and try a completed '
-                         'session. Some sessions have incomplete timing coverage.') from exc
-
-
-@st.cache_data(ttl=3600, max_entries=2, show_spinner=False)
-def fastest_telemetry(year, round_number, name, driver):
-    session = session_data(year, round_number, name, telemetry=True)
+def _style_maps(session, data, results):
+    """Capture FastF1 driver/team styling without retaining the Session itself."""
+    styles = {'driver': {}, 'team': {}}
     try:
-        d = personal_bests(normalize(session.laps))
-        d = d.loc[d.Driver.eq(driver)]
-        if d.empty:
-            raise NoData('This driver has no valid timed lap in the selected session.')
-        best = d.sort_values('LapTimeSeconds').iloc[0]
-        lap = session.laps.loc[(session.laps.Driver == driver)
-                               & (session.laps.LapNumber == best.LapNumber)].iloc[0]
-        tel = pd.DataFrame(lap.get_telemetry()).copy()
-        if not {'X', 'Y', 'Speed'}.issubset(tel.columns):
-            raise NoData('Position or speed telemetry is missing for this lap.')
-        # Keep bad samples as gaps: dropping them would connect across missing data.
-        import numpy as np
-        for col in ['X', 'Y', 'Speed']:
-            tel[col] = pd.to_numeric(tel[col], errors='coerce').replace([np.inf, -np.inf], np.nan)
-        tel.loc[tel.Speed.lt(0), 'Speed'] = np.nan
-        if len(tel.dropna(subset=['X', 'Y', 'Speed'])) < 3:
+        import fastf1.plotting as fp
+        drivers = list(dict.fromkeys(
+            results.get('Abbreviation', pd.Series(dtype=object)).dropna().astype(str).tolist()
+            + data.Driver.dropna().astype(str).tolist()
+        ))
+        teams = list(dict.fromkeys(data.Team.dropna().astype(str).tolist()))
+        for driver in drivers:
+            try:
+                style = fp.get_driver_style(identifier=driver,
+                                            style=['color', 'linestyle'],
+                                            session=session)
+                styles['driver'][driver] = {
+                    'color': style.get('color'),
+                    'linestyle': style.get('linestyle', '-')
+                }
+            except Exception:
+                try:
+                    styles['driver'][driver] = {
+                        'color': fp.get_driver_color(driver, session=session),
+                        'linestyle': '-'
+                    }
+                except Exception:
+                    pass
+        for team in teams:
+            try:
+                styles['team'][team] = fp.get_team_color(team, session=session)
+            except Exception:
+                pass
+    except Exception:
+        log.exception('Could not capture FastF1 style map; deterministic fallbacks will be used')
+    return styles
+
+
+def _load_snapshot(year, round_number, name):
+    """Load FastF1 once, copy lean chart inputs, then release the full Session."""
+    session = None
+    try:
+        rss = current_rss_mb()
+        if rss is not None:
+            log.info('Memory before FastF1 load: %.1f MB RSS', rss)
+        session = fastf1.get_session(year, round_number, name)
+        # No telemetry/weather/race-control messages are needed for the core
+        # lap-based charts. Position history and telemetry have separate lean
+        # on-demand paths below.
+        session.load(telemetry=False, weather=False, messages=False)
+        if session.laps.empty:
+            raise NoData('No lap data is available. The session may not have started, may have '
+                         'been cancelled, or its timing data may not yet be published.')
+        data = normalize(session.laps)
+        results = _results_frame(session)
+        styles = _style_maps(session, data, results)
+        api_path = str(session.api_path)
+        return {'data': data, 'results': results, 'styles': styles, 'api_path': api_path}
+    finally:
+        session = None
+        _release_memory('releasing full FastF1 session')
+
+
+@st.cache_data(ttl=3600, max_entries=1, show_spinner=False)
+def session_snapshot(year, round_number, name):
+    """Small, serialisable representation of one selected session.
+
+    Only one snapshot is kept because session switching should not grow the
+    Streamlit data cache indefinitely on a small hosted instance.
+    """
+    try:
+        return _load_snapshot(year, round_number, name)
+    except NoData:
+        raise
+    except Exception as exc:
+        log.exception('Session load failed: %s %s %s', year, round_number, name)
+        raise NoData('Session data could not be loaded. Check your connection and try a completed '
+                     'session. Some sessions have incomplete timing coverage.') from exc
+
+
+def _naive_utc(value):
+    ts = pd.Timestamp(value)
+    if pd.isna(ts):
+        return pd.NaT
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert('UTC').tz_localize(None)
+    return ts
+
+
+def _decode_driver_car(api_path, driver_number, start, end, pad_seconds=1.0):
+    """Decode only one driver's speed samples from the compressed car stream."""
+    from fastf1 import _api
+    response = None
+    rows = []
+    lower = start - pd.Timedelta(seconds=pad_seconds)
+    upper = end + pd.Timedelta(seconds=pad_seconds)
+    drv = str(driver_number)
+    try:
+        response = _api.fetch_page(api_path, 'car_data')
+        if not response:
+            raise NoData('Car telemetry is unavailable for this session.')
+        for record in response:
+            try:
+                jrecord = _api.parse(record[12:], zipped=True)
+                finished = False
+                for entry in jrecord.get('Entries', []):
+                    date = _naive_utc(entry.get('Utc'))
+                    if pd.isna(date):
+                        continue
+                    if date < lower:
+                        continue
+                    if date > upper:
+                        finished = True
+                        break
+                    car = entry.get('Cars', {}).get(drv)
+                    if not car:
+                        continue
+                    channels = car.get('Channels', {})
+                    if '2' not in channels:
+                        continue
+                    rows.append((date, pd.to_numeric(channels.get('2'), errors='coerce')))
+                if finished and rows:
+                    break
+            except Exception:
+                continue
+    finally:
+        response = None
+        _release_memory('decoding selected-driver car telemetry')
+    out = pd.DataFrame(rows, columns=['Date', 'Speed'])
+    if out.empty:
+        raise NoData('Speed telemetry is unavailable for this driver’s fastest valid lap.')
+    return out.dropna(subset=['Date', 'Speed']).drop_duplicates('Date').sort_values('Date')
+
+
+def _decode_driver_position(api_path, driver_number, start, end, pad_seconds=1.0):
+    """Decode only one driver's X/Y samples from the compressed position stream."""
+    from fastf1 import _api
+    response = None
+    rows = []
+    lower = start - pd.Timedelta(seconds=pad_seconds)
+    upper = end + pd.Timedelta(seconds=pad_seconds)
+    drv = str(driver_number)
+    try:
+        response = _api.fetch_page(api_path, 'position')
+        if not response:
+            raise NoData('Position telemetry is unavailable for this session.')
+        for record in response:
+            try:
+                jrecord = _api.parse(record[12:], zipped=True)
+                finished = False
+                for sample in jrecord.get('Position', []):
+                    date = _naive_utc(sample.get('Timestamp'))
+                    if pd.isna(date):
+                        continue
+                    if date < lower:
+                        continue
+                    if date > upper:
+                        finished = True
+                        break
+                    pos = sample.get('Entries', {}).get(drv)
+                    if not pos:
+                        continue
+                    x = pd.to_numeric(pos.get('X'), errors='coerce')
+                    y = pd.to_numeric(pos.get('Y'), errors='coerce')
+                    rows.append((date, x, y))
+                if finished and rows:
+                    break
+            except Exception:
+                continue
+    finally:
+        response = None
+        _release_memory('decoding selected-driver position telemetry')
+    out = pd.DataFrame(rows, columns=['Date', 'X', 'Y'])
+    if out.empty:
+        raise NoData('Position telemetry is unavailable for this driver’s fastest valid lap.')
+    return out.dropna(subset=['Date', 'X', 'Y']).drop_duplicates('Date').sort_values('Date')
+
+
+@st.cache_data(ttl=3600, max_entries=1, show_spinner=False)
+def fastest_telemetry(year, round_number, name, driver):
+    """Low-memory fastest-lap speed map inputs.
+
+    Instead of Session.load(telemetry=True), which materialises telemetry for the
+    full field, parse only the selected driver's car/position samples around the
+    selected lap and interpolate positions onto the car-data timestamps.
+    """
+    snapshot = session_snapshot(year, round_number, name)
+    d = personal_bests(snapshot['data'])
+    d = d.loc[d.Driver.eq(driver)]
+    if d.empty:
+        raise NoData('This driver has no valid timed lap in the selected session.')
+    best = d.sort_values('LapTimeSeconds').iloc[0]
+    start = _naive_utc(best.get('LapStartDate'))
+    seconds = float(best.LapTimeSeconds)
+    if pd.isna(start) or not np.isfinite(seconds) or seconds <= 0:
+        raise NoData('The fastest lap has no usable absolute lap timing for telemetry slicing.')
+    end = start + pd.Timedelta(seconds=seconds)
+    driver_number = best.get('DriverNumber')
+    if pd.isna(driver_number) or str(driver_number).strip() in ('', 'nan', 'None'):
+        results = snapshot['results']
+        if {'Abbreviation', 'DriverNumber'}.issubset(results.columns):
+            matches = results.loc[results.Abbreviation.eq(driver), 'DriverNumber'].dropna()
+            if not matches.empty:
+                driver_number = matches.iloc[0]
+    if pd.isna(driver_number) or str(driver_number).strip() in ('', 'nan', 'None'):
+        raise NoData('The selected driver’s timing number is unavailable for telemetry lookup.')
+
+    try:
+        car = _decode_driver_car(snapshot['api_path'], driver_number, start, end)
+        pos = _decode_driver_position(snapshot['api_path'], driver_number, start, end)
+        # Keep only original car samples from the timed lap itself. Position is
+        # interpolated by timestamp between the surrounding official samples.
+        car = car.loc[car.Date.between(start, end)].copy()
+        pos = pos.loc[pos.Date.between(start - pd.Timedelta(seconds=1),
+                                       end + pd.Timedelta(seconds=1))].copy()
+        if len(car) < 3 or len(pos) < 3:
             raise NoData('There are too few telemetry samples to draw this lap.')
+        target = car.Date.astype('int64').to_numpy(dtype=np.int64)
+        ptime = pos.Date.astype('int64').to_numpy(dtype=np.int64)
+        inside = (target >= ptime.min()) & (target <= ptime.max())
+        car = car.loc[inside].copy()
+        target = target[inside]
+        if len(target) < 3:
+            raise NoData('There are too few overlapping car/position samples to draw this lap.')
+        tel = pd.DataFrame({
+            'Date': car.Date.to_numpy(),
+            'Time': (car.Date - start).to_numpy(),
+            'Speed': pd.to_numeric(car.Speed, errors='coerce').to_numpy(dtype=float),
+            'X': np.interp(target, ptime, pd.to_numeric(pos.X, errors='coerce').to_numpy(dtype=float)),
+            'Y': np.interp(target, ptime, pd.to_numeric(pos.Y, errors='coerce').to_numpy(dtype=float)),
+        })
+        tel.loc[tel.Speed.lt(0), 'Speed'] = np.nan
         tel['Driver'] = driver
-        tel['LapNumber'] = best.LapNumber
-        return tel, float(best.LapTimeSeconds), int(best.LapNumber)
+        tel['LapNumber'] = int(best.LapNumber)
+        if len(tel.dropna(subset=['X', 'Y', 'Speed'])) < 3:
+            raise NoData('There are too few valid telemetry samples to draw this lap.')
+        return tel, seconds, int(best.LapNumber)
     except NoData:
         raise
     except Exception as exc:
         log.exception('Telemetry unavailable for %s', driver)
         raise NoData('Speed/position telemetry is unavailable for this driver’s fastest valid lap. '
                      'Try another driver or session. Timing charts can still be used.') from exc
+    finally:
+        _release_memory('building selected-driver telemetry')
 
 
-@st.cache_data(ttl=3600, max_entries=2, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=1, show_spinner=False)
 def reported_positions(year, round_number, name):
-    session = session_data(year, round_number, name)
+    snapshot = session_snapshot(year, round_number, name)
+    raw = None
     try:
         # Deliberately isolated private API dependency, pinned to FastF1 3.8.3.
-        # The high-level laps.Position is derived from aligned timestamps and
-        # demonstrably incorrect for some delayed-start sessions.
         from fastf1 import _api
-        raw = _api.fetch_page(session.api_path, 'timing_data')
+        raw = _api.fetch_page(snapshot['api_path'], 'timing_data')
         if not raw:
             raise NoData('The reported position feed is unavailable. No timestamp-derived substitute will be plotted.')
-        roster_rows = pd.DataFrame(session.results)
+        roster_rows = snapshot['results']
+        if not {'DriverNumber', 'Abbreviation'}.issubset(roster_rows.columns):
+            raise NoData('Driver-number mapping is unavailable for the reported position feed.')
         mapping = dict(zip(roster_rows.DriverNumber.astype(str), roster_rows.Abbreviation))
         out = position_observations(raw, mapping)
-        original = pd.DataFrame(session.laps)[['Driver', 'LapNumber', 'Position']].rename(columns={'Position':'FastF1DerivedPosition'})
+        original = snapshot['data'][['Driver', 'LapNumber', 'Position']].rename(
+            columns={'Position': 'FastF1DerivedPosition'})
         original = original.drop_duplicates(['Driver', 'LapNumber'], keep=False)
-        return out.merge(original, on=['Driver','LapNumber'], how='left', validate='one_to_one')
+        return out.merge(original, on=['Driver', 'LapNumber'], how='left', validate='one_to_one')
     except NoData:
         raise
     except Exception as exc:
         log.exception('Reported position feed unavailable')
         raise NoData('Reported race positions could not be loaded. No timestamp-derived substitute will be plotted; try refreshing or another session.') from exc
+    finally:
+        raw = None
+        _release_memory('reported position feed')
 
 
-def roster(session, d):
-    result = pd.DataFrame(session.results)
+def roster(results, d):
+    result = pd.DataFrame(results)
     ordered = result.Abbreviation.dropna().tolist() if 'Abbreviation' in result else []
     ordered = list(dict.fromkeys([x for x in ordered if x] + d.Driver.dropna().tolist()))
     labels = {x: x for x in ordered}
-    if {'Abbreviation','FullName'}.issubset(result):
+    if {'Abbreviation', 'FullName'}.issubset(result):
         for _, row in result.iterrows():
             if row.Abbreviation in labels and pd.notna(row.FullName):
                 labels[row.Abbreviation] = f'{row.FullName} ({row.Abbreviation})'
@@ -181,24 +361,25 @@ def roster(session, d):
 
 
 def precache_weekend(year, round_number, session_names):
-    """Warm FastF1's disk cache without retaining weekend sessions in RAM.
-
-    The currently retained in-process session is released first. Each completed
-    session is then loaded one at a time with telemetry disabled and immediately
-    discarded. This keeps peak memory close to one FastF1 Session while making
-    later selected-session loads cheaper because the source files are on disk.
-    """
-    clear_session_cache()
+    """Warm FastF1's disk cache one timing-only session at a time."""
+    # Do not populate session_snapshot here: this control is for the on-disk
+    # FastF1 cache and should not increase Streamlit's retained memory.
+    session_snapshot.clear()
+    fastest_telemetry.clear()
+    reported_positions.clear()
     report = []
-    for name in session_names:
+    for session_name in session_names:
         session = None
         try:
-            session = _load_new_session(year, round_number, name, telemetry=False)
-            report.append({'session': name, 'status': 'cached'})
+            session = fastf1.get_session(year, round_number, session_name)
+            session.load(telemetry=False, weather=False, messages=False)
+            if session.laps.empty:
+                raise NoData('No lap data is available.')
+            report.append({'session': session_name, 'status': 'cached'})
         except Exception as exc:
-            log.exception('Weekend pre-cache failed: %s %s %s', year, round_number, name)
-            report.append({'session': name, 'status': 'failed', 'error': str(exc)})
+            log.exception('Weekend pre-cache failed: %s %s %s', year, round_number, session_name)
+            report.append({'session': session_name, 'status': 'failed', 'error': str(exc)})
         finally:
             session = None
-            gc.collect()
+            _release_memory(f'pre-caching {session_name}')
     return report

@@ -70,11 +70,11 @@ The optional quick filter retains LapTime ≤ 1.07 × the minimum retained lap w
 
 ## 7. Speed on Track Map
 
-**Fields:** PB selection fields from analysis 1; FastF1 `Lap.get_telemetry()` X, Y, Speed, Time; source telemetry columns exported.
+**Fields:** PB selection fields from analysis 1 plus `DriverNumber` and `LapStartDate`; FastF1 3.8.3 raw car-data `Date`/`Speed` samples and raw position-data `Date`/`X`/`Y` samples for the selected driver and lap window.
 
-**Calculation:** select one driver's fastest confirmed PB; do not silently choose a slower lap if its telemetry fails. Colour each adjacent X/Y segment by mean endpoint speed (km/h). Equal axis aspect. Require at least three finite speed/position samples and two usable continuous segments. Invalid/nonfinite/negative speed samples form gaps; intervals ≤0 or >2 seconds are not connected. The two-second rule is a conservative display-gap threshold, not a claim about FastF1's sampling frequency.
+**Calculation:** select one driver's fastest confirmed PB; do not silently choose a slower lap if its telemetry fails. To avoid materialising full-field telemetry on small hosted instances, decode only that driver's compressed car/position stream around the lap. Preserve original car-data speed samples and linearly interpolate X/Y by timestamp between the surrounding official position samples. Colour each adjacent X/Y segment by mean endpoint speed (km/h). Equal axis aspect. Require at least three finite speed/position samples and two usable continuous segments. Invalid/nonfinite/negative speed samples form gaps; intervals ≤0 or >2 seconds are not connected. The two-second rule is a conservative display-gap threshold, not a claim about FastF1's sampling frequency.
 
-**Tutorial:** Speed Visualization on Track Map, with correct segment-to-colour alignment and missing-data handling. No geographic positioning/corner attribution, two-driver comparison, or lap-delta inference. FastF1 telemetry can be interpolated; the plot is not a measurement at every rendered pixel.
+**Tutorial:** Speed Visualization on Track Map, with the same fastest-PB and segment-colouring concept. The hosted low-memory path does not call `Lap.get_telemetry()` and therefore does not add FastF1's extra merged channels such as driver-ahead/distance; they are irrelevant to this chart. X/Y interpolation is explicitly timestamp-based and limited to the selected lap. No geographic positioning/corner attribution, two-driver comparison, or lap-delta inference.
 
 ## 8. Practice Compound Usage and Performance
 

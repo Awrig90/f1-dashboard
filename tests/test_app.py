@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 from f1dash.demo import demo_session,demo_telemetry
-from f1dash.processing import NoData
+from f1dash.processing import NoData, normalize
 
 APP = str(Path(__file__).resolve().parents[1]/'app.py')
 EVENTS=pd.DataFrame([{'RoundNumber':1,'EventName':'Test Grand Prix','F1ApiSupport':True,
@@ -19,7 +19,7 @@ def button(app,label):
 
 def test_workflow_all_analyses_and_stale_results():
     with patch('f1dash.data.schedule',return_value=EVENTS), \
-         patch('f1dash.data.session_data',return_value=demo_session()), \
+         patch('f1dash.data.session_snapshot',return_value={'data': normalize(demo_session().laps), 'results': demo_session().results, 'styles': {}, 'api_path': '/static/test/'}), \
          patch('f1dash.data.reported_positions',return_value=demo_session().laps[['Driver','LapNumber','Position']]), \
          patch('f1dash.data.fastest_telemetry',return_value=demo_telemetry('NOR')):
         at=AppTest.from_file(APP,default_timeout=30).run()

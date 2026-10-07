@@ -144,21 +144,23 @@ analysis-specific automatic label. PNG exports use the text currently selected i
 
 ## Optional weekend pre-caching
 
-The app keeps **only one full FastF1 Session object in process memory at a time**. Loading an entire
-weekend into RAM is deliberately avoided because a 512 MB host can exceed its memory limit quickly.
-**Cache management** in the sidebar can still pre-cache all completed sessions from the selected Grand
-Prix to FastF1's disk cache. Those sessions are loaded one at a time with telemetry disabled and then
-discarded, so later session loads can reuse downloaded files without retaining the whole weekend in RAM.
-Telemetry remains lazy and is loaded into the currently selected session only when a telemetry-based
-visualisation needs it.
+The hosted app does **not retain a full FastF1 Session object between Streamlit reruns**. Each selected
+session is loaded long enough to extract a narrow plain-Pandas lap table, results, API path and FastF1
+style map; the full Session is then released. This keeps the interactive working set much smaller on a
+512 MB host. **Cache management** can still pre-cache completed sessions to FastF1's disk cache one at a
+time, with telemetry, weather and race-control messages disabled.
 
 ## Hosted-performance behaviour
 
-Repeated Streamlit reruns for the same selected session reuse one retained FastF1 Session object. When
-the user switches session, the previous object is released before the replacement is loaded and garbage
-collection is requested. Small processed-data caches are also tightly bounded. Chart generation renders
-the PNG once at 300 dpi; those same bytes are used for the on-screen preview and the immediate **Download
-PNG** control. **Refresh session data** clears Streamlit data caches and the retained FastF1 session.
+The lightweight extracted snapshot is cached for the currently selected session, not the full FastF1
+Session. Reported race positions use the timing feed directly. The speed map uses a separate low-memory
+path that decodes only the selected driver's speed and X/Y samples around the fastest lap instead of
+materialising telemetry for the whole field. Chart generation still renders once at 300 dpi; those same
+bytes are used for the on-screen preview and immediate **Download PNG** control.
+
+On Linux hosts the app also requests garbage collection and a best-effort glibc heap trim after large
+FastF1 operations. Current RSS is logged around session extraction and chart rendering to make any future
+memory-limit problem diagnosable from host logs. **Refresh session data** clears Streamlit's data cache.
 
 On hosts with ephemeral filesystems, FastF1's disk cache can still disappear after a service restart or
 spin-down. A persistent disk and an always-on service are hosting concerns rather than application

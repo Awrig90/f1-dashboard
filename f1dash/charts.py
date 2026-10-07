@@ -23,20 +23,32 @@ class Result:
     notes: list = field(default_factory=list)
 
 class Styling:
-    def __init__(self, session=None):
+    def __init__(self, session=None, style_maps=None):
         self.session = session
+        self.style_maps = style_maps or {'driver': {}, 'team': {}}
     def color(self, identifier, kind='driver'):
+        if kind == 'compound':
+            return COMPOUNDS.get(identifier, '#8b91a0')
+        if kind == 'driver':
+            style = self.style_maps.get('driver', {}).get(identifier)
+            if isinstance(style, dict) and style.get('color'):
+                return style['color']
+        if kind == 'team':
+            color = self.style_maps.get('team', {}).get(identifier)
+            if color:
+                return color
         if self.session is not None:
             try:
                 import fastf1.plotting as fp
                 return getattr(fp, f'get_{kind}_color')(identifier, session=self.session)
             except (KeyError, ValueError, TypeError, AttributeError):
                 pass
-        if kind == 'compound':
-            return COMPOUNDS.get(identifier, '#8b91a0')
         # Deterministic fallback for unknown/new driver/team identities.
         return plt.get_cmap('tab20')(sum(map(ord, str(identifier))) % 20)
     def driver(self, identifier):
+        style = self.style_maps.get('driver', {}).get(identifier)
+        if isinstance(style, dict) and style.get('color'):
+            return {'color': style['color'], 'linestyle': style.get('linestyle') or '-'}
         if self.session is not None:
             try:
                 import fastf1.plotting as fp
@@ -86,10 +98,10 @@ def lap_label(seconds):
     return f'{int(seconds//60)}:{seconds%60:06.3f}'
 
 def generate(key, d, context, drivers=None, teams=None, options=p.FilterOptions(),
-             session=None, telemetry=None, positions=None, chart_text=None):
+             session=None, telemetry=None, positions=None, chart_text=None, styles=None):
     """context requires year, event, session; filters never modify benchmark population."""
     title = f"{context['year']} {context['event']} · {context['session']}"
-    style = Styling(session)
+    style = Styling(session, styles)
     r = Result()
     conflicts = int(d.DuplicateLapConflict.sum())
     if conflicts:
@@ -275,5 +287,5 @@ def png_bytes(fig, dpi=300):
     The dashboard renders its downloadable chart output at 300 dpi.
     """
     output = BytesIO()
-    fig.savefig(output,format='png',dpi=dpi,bbox_inches='tight',facecolor='white')
+    fig.savefig(output,format='png',dpi=dpi,facecolor='white')
     return output.getvalue()

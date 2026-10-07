@@ -6,9 +6,9 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import matplotlib.pyplot as plt
 from f1dash.catalog import available
-from f1dash.data import session_data,fastest_telemetry,reported_positions,roster
-from f1dash.processing import normalize,csv_bytes
-from f1dash.charts import generate,png_bytes
+from f1dash.data import session_snapshot, fastest_telemetry, reported_positions, roster, schedule
+from f1dash.processing import csv_bytes
+from f1dash.charts import generate, png_bytes
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--year',type=int,default=2024)
@@ -18,19 +18,23 @@ parser.add_argument('--telemetry',action='store_true',help='Also download and ch
 parser.add_argument('--output',type=Path,default=Path('live-exports'))
 args=parser.parse_args()
 args.output.mkdir(parents=True,exist_ok=True)
-session=session_data(args.year,args.round,args.session)
-d=normalize(session.laps)
-context={'year':args.year,'event':session.event.EventName,'session':session.name}
-all_drivers,_=roster(session,d)
+
+snapshot=session_snapshot(args.year,args.round,args.session)
+d=snapshot['data']
+events=schedule(args.year)
+event_row=events.loc[events.RoundNumber.eq(args.round)].iloc[0]
+context={'year':args.year,'event':event_row.EventName,'session':args.session}
+all_drivers,_=roster(snapshot['results'],d)
 report={}
-for analysis in available(session.name):
+for analysis in available(args.session):
     if analysis.key=='speed' and not args.telemetry:
         report[analysis.key]={'skipped':'Use --telemetry to download telemetry.'}; continue
     try:
         drivers=[all_drivers[0]] if analysis.selector=='driver' else all_drivers
         telemetry=fastest_telemetry(args.year,args.round,args.session,drivers[0]) if analysis.key=='speed' else None
         positions=reported_positions(args.year,args.round,args.session) if analysis.key=='positions' else None
-        result=generate(analysis.key,d,context,drivers=drivers,session=session,telemetry=telemetry,positions=positions)
+        result=generate(analysis.key,d,context,drivers=drivers,telemetry=telemetry,positions=positions,
+                        styles=snapshot.get('styles'))
         for name,fig in result.figures.items():
             (args.output/f'{name}.png').write_bytes(png_bytes(fig)); plt.close(fig)
         for name,table in result.tables.items():

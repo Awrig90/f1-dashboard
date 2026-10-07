@@ -13,15 +13,26 @@ class FilterOptions:
     green_only: bool = True
 
 TIME_COLUMNS = ('LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time')
+LAP_SOURCE_COLUMNS = (
+    'Driver', 'DriverNumber', 'Team', 'Compound', 'LapNumber', 'Stint', 'Position',
+    'LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time', 'LapStartDate',
+    'PitInTime', 'PitOutTime', 'Time', 'IsPersonalBest', 'Deleted',
+    'FastF1Generated', 'IsAccurate', 'TrackStatus'
+)
 
 def normalize(laps):
-    d = pd.DataFrame(laps).copy().reset_index(drop=True)
+    # Convert FastF1's extended Laps frame to a plain, deliberately narrow
+    # DataFrame. Retaining every FastF1 column needlessly increases RAM on the
+    # hosted dashboard and can preserve metadata references to the source.
+    source = pd.DataFrame(laps)
+    keep = [col for col in LAP_SOURCE_COLUMNS if col in source.columns]
+    d = source.loc[:, keep].copy().reset_index(drop=True)
     for col in TIME_COLUMNS:
         d[col + 'Seconds'] = (pd.to_timedelta(d[col], errors='coerce').dt.total_seconds()
                                   if col in d else np.nan)
-    defaults = {'Driver': None, 'Team': 'Unknown', 'Compound': 'UNKNOWN',
+    defaults = {'Driver': None, 'DriverNumber': None, 'Team': 'Unknown', 'Compound': 'UNKNOWN',
                 'LapNumber': np.nan, 'Stint': np.nan, 'Position': np.nan,
-                'PitInTime': pd.NaT, 'PitOutTime': pd.NaT,
+                'LapStartDate': pd.NaT, 'PitInTime': pd.NaT, 'PitOutTime': pd.NaT,
                 'Time': pd.NaT, 'IsPersonalBest': False,
                 'Deleted': pd.NA, 'FastF1Generated': False, 'IsAccurate': False,
                 'TrackStatus': ''}
