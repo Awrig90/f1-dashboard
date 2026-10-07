@@ -24,14 +24,18 @@ The main selectors, nine analyses, tabs, downloads and module architecture are r
 See `docs/AUDIT.md` and `docs/METHODOLOGY.md` for the findings and exact definitions.
 
 
-## Hosted performance update
+## Hosted performance / memory update
 
-This package also includes a responsiveness pass for low-CPU hosting:
+The first hosted-performance build retained several loaded FastF1 sessions and proved too memory-hungry
+for a 512 MB Render instance. This revision uses a strict low-memory model:
 
-- loaded FastF1 Session objects now use Streamlit's resource cache instead of being serialized/copied via `st.cache_data` on each rerun;
-- **Pre-cache selected weekend** now warms the in-process loaded-session cache as well as FastF1's disk cache;
-- charts render once at 300 dpi and the same PNG bytes are used for display and download;
-- 300 dpi PNGs are generated with the chart and are immediately available via **Download PNG**;
-- **Refresh session data** clears both data and resource caches.
+- at most **one full FastF1 Session** is deliberately retained in process memory;
+- repeated reruns for the same selected session reuse that object;
+- switching session releases the previous object before loading the replacement;
+- **Pre-cache selected weekend** is now disk-only: sessions are loaded sequentially, telemetry disabled, and discarded after their FastF1 cache files are warmed;
+- telemetry is loaded lazily into the currently selected session instead of creating a separate telemetry-keyed Session cache entry;
+- telemetry and reported-position data caches are tightly bounded;
+- charts still render once at 300 dpi and are immediately available through **Download PNG**;
+- **Refresh session data** clears Streamlit data caches and the retained FastF1 session.
 
-These changes do not alter analytical definitions or chart calculations. Telemetry remains lazy. Resource-cached Session objects are treated as read-only.
+These changes do not alter analytical definitions or chart calculations.

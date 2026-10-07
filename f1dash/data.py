@@ -1,10 +1,14 @@
-"""FastF1 boundary: disk cache, bounded Streamlit caches, lazy telemetry."""
+"""FastF1 boundary: disk cache, one in-process session, lazy telemetry."""
+import gc
 import logging
 import os
 from pathlib import Path
+from threading import RLock
+
 import pandas as pd
 import fastf1
 import streamlit as st
+
 from .processing import NoData, normalize, personal_bests, position_observations
 
 CACHE_DIR = Path(os.environ.get('F1_CACHE_DIR', Path(__file__).resolve().parents[1] / '.fastf1-cache'))
@@ -12,7 +16,18 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 fastf1.Cache.enable_cache(str(CACHE_DIR))
 log = logging.getLogger(__name__)
 
-@st.cache_data(ttl=3600, max_entries=12, show_spinner=False)
+# Keep exactly one loaded FastF1 Session object in this Python process. This is
+# intentionally separate from Streamlit's resource cache: small hosts (notably
+# 512 MB instances) cannot safely retain several full weekend sessions at once.
+_SESSION_LOCK = RLock()
+_CURRENT_SESSION = {
+    'key': None,
+    'session': None,
+    'telemetry_loaded': False,
+}
+
+
+@st.cache_data(ttl=3600, max_entries=6, show_spinner=False)
 def schedule(year):
     try:
         result = fastf1.get_event_schedule(year, include_testing=False)
@@ -22,25 +37,82 @@ def schedule(year):
         raise NoData('The event schedule could not be loaded. Check your internet connection, '
                      'try again, or choose another season.') from exc
 
-@st.cache_resource(ttl=3600, max_entries=10, show_spinner=False)
-def session_data(year, round_number, name, telemetry=False):
-    # A loaded FastF1 Session is expensive to pickle/copy on every Streamlit rerun.
-    # Keep the object in the process resource cache and treat it as read-only.
-    try:
-        session = fastf1.get_session(year, round_number, name)
-        session.load(telemetry=telemetry, weather=False, messages=True)
-        if session.laps.empty:
-            raise NoData('No lap data is available. The session may not have started, may have '
-                         'been cancelled, or its timing data may not yet be published.')
-        return session
-    except NoData:
-        raise
-    except Exception as exc:
-        log.exception('Session load failed: %s %s %s', year, round_number, name)
-        raise NoData('Session data could not be loaded. Check your connection and try a completed '
-                     'session. Some sessions have incomplete timing coverage.') from exc
 
-@st.cache_data(ttl=3600, max_entries=8, show_spinner=False)
+def _load_new_session(year, round_number, name, telemetry=False):
+    """Create and load one FastF1 session without retaining it globally."""
+    session = fastf1.get_session(year, round_number, name)
+    session.load(telemetry=telemetry, weather=False, messages=True)
+    if session.laps.empty:
+        raise NoData('No lap data is available. The session may not have started, may have '
+                     'been cancelled, or its timing data may not yet be published.')
+    return session
+
+
+def _clear_derived_caches():
+    """Drop small session-specific caches when the selected session changes."""
+    for name in ('fastest_telemetry', 'reported_positions'):
+        cached = globals().get(name)
+        clear = getattr(cached, 'clear', None)
+        if clear is not None:
+            clear()
+
+
+def clear_session_cache():
+    """Drop the retained FastF1 Session and its session-specific derived caches."""
+    with _SESSION_LOCK:
+        _CURRENT_SESSION['session'] = None
+        _CURRENT_SESSION['key'] = None
+        _CURRENT_SESSION['telemetry_loaded'] = False
+    _clear_derived_caches()
+    gc.collect()
+
+
+def session_data(year, round_number, name, telemetry=False):
+    """Return the selected session while retaining at most one full Session.
+
+    Repeated reruns for the same selected session reuse the same object. Switching
+    sessions drops the previous object before the replacement is loaded. Telemetry
+    is loaded lazily into that same object rather than creating a second cached
+    copy of the session.
+    """
+    key = (int(year), int(round_number), str(name))
+    with _SESSION_LOCK:
+        try:
+            if _CURRENT_SESSION['key'] != key or _CURRENT_SESSION['session'] is None:
+                _clear_derived_caches()
+                # Release the previous session before loading the replacement so
+                # peak RAM is kept as low as practical on small hosted instances.
+                _CURRENT_SESSION['session'] = None
+                _CURRENT_SESSION['key'] = None
+                _CURRENT_SESSION['telemetry_loaded'] = False
+                gc.collect()
+
+                session = _load_new_session(year, round_number, name, telemetry=False)
+                _CURRENT_SESSION['session'] = session
+                _CURRENT_SESSION['key'] = key
+
+            session = _CURRENT_SESSION['session']
+            if telemetry and not _CURRENT_SESSION['telemetry_loaded']:
+                # FastF1 supports loading the same Session again with telemetry
+                # enabled; this augments the retained object instead of caching a
+                # second full Session keyed by telemetry=True.
+                session.load(telemetry=True, weather=False, messages=True)
+                _CURRENT_SESSION['telemetry_loaded'] = True
+                if session.laps.empty:
+                    raise NoData('No lap data is available. The session may not have started, may have '
+                                 'been cancelled, or its timing data may not yet be published.')
+            return session
+        except NoData:
+            clear_session_cache()
+            raise
+        except Exception as exc:
+            clear_session_cache()
+            log.exception('Session load failed: %s %s %s', year, round_number, name)
+            raise NoData('Session data could not be loaded. Check your connection and try a completed '
+                         'session. Some sessions have incomplete timing coverage.') from exc
+
+
+@st.cache_data(ttl=3600, max_entries=2, show_spinner=False)
 def fastest_telemetry(year, round_number, name, driver):
     session = session_data(year, round_number, name, telemetry=True)
     try:
@@ -71,7 +143,8 @@ def fastest_telemetry(year, round_number, name, driver):
         raise NoData('Speed/position telemetry is unavailable for this driver’s fastest valid lap. '
                      'Try another driver or session. Timing charts can still be used.') from exc
 
-@st.cache_data(ttl=3600, max_entries=8, show_spinner=False)
+
+@st.cache_data(ttl=3600, max_entries=2, show_spinner=False)
 def reported_positions(year, round_number, name):
     session = session_data(year, round_number, name)
     try:
@@ -94,6 +167,7 @@ def reported_positions(year, round_number, name):
         log.exception('Reported position feed unavailable')
         raise NoData('Reported race positions could not be loaded. No timestamp-derived substitute will be plotted; try refreshing or another session.') from exc
 
+
 def roster(session, d):
     result = pd.DataFrame(session.results)
     ordered = result.Abbreviation.dropna().tolist() if 'Abbreviation' in result else []
@@ -107,19 +181,24 @@ def roster(session, d):
 
 
 def precache_weekend(year, round_number, session_names):
-    """Warm both FastF1's disk cache and the in-process loaded-session cache.
+    """Warm FastF1's disk cache without retaining weekend sessions in RAM.
 
-    Telemetry is deliberately excluded: timing/lap data are the common path and
-    telemetry is much larger. A telemetry plot still fetches/cache it on demand.
-    Keeping completed weekend sessions as Streamlit resources makes later session
-    switches avoid reparsing/copying the full FastF1 Session object.
+    The currently retained in-process session is released first. Each completed
+    session is then loaded one at a time with telemetry disabled and immediately
+    discarded. This keeps peak memory close to one FastF1 Session while making
+    later selected-session loads cheaper because the source files are on disk.
     """
+    clear_session_cache()
     report = []
     for name in session_names:
+        session = None
         try:
-            session_data(year, round_number, name, telemetry=False)
+            session = _load_new_session(year, round_number, name, telemetry=False)
             report.append({'session': name, 'status': 'cached'})
         except Exception as exc:
             log.exception('Weekend pre-cache failed: %s %s %s', year, round_number, name)
             report.append({'session': name, 'status': 'failed', 'error': str(exc)})
+        finally:
+            session = None
+            gc.collect()
     return report

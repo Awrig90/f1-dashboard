@@ -1,5 +1,6 @@
 """Run with: python -m streamlit run app.py"""
 from dataclasses import asdict
+import gc
 import json
 import logging
 import re
@@ -8,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from f1dash import catalog, processing as p
 from f1dash.charts import generate, png_bytes, PLOT_LOCK
-from f1dash.data import schedule, session_data, fastest_telemetry, reported_positions, roster, precache_weekend
+from f1dash.data import schedule, session_data, fastest_telemetry, reported_positions, roster, precache_weekend, clear_session_cache
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('f1dash')
@@ -106,12 +107,13 @@ with st.sidebar:
     if st.button('Refresh session data',help='Clear in-memory caches and refresh on the next load.'):
         st.cache_data.clear()
         st.cache_resource.clear()
+        clear_session_cache()
         old_output = st.session_state.pop('output',None)
         if old_output:
             for fig in old_output.get('_figures',{}).values():
                 plt.close(fig)
     st.caption('FastF1 3.8.3 · 300 dpi PNG exports')
-    st.caption('First loads can be slow. Loaded sessions are kept in memory for faster reruns and switching.')
+    st.caption('First loads can be slow. Only the selected session is kept in memory; switching sessions releases the previous one.')
 
 columns = st.columns([1,2,1.5])
 year = columns[0].selectbox('Season',catalog.seasons(),key='year')
@@ -142,7 +144,7 @@ name = columns[2].selectbox('Session',session_names,key=f'session-{year}-{round_
 
 if not demo:
     with st.sidebar.expander('Cache management', expanded=False):
-        st.caption('Optional: load completed sessions from this Grand Prix once, warming both the FastF1 disk cache and the in-memory session cache for faster switching.')
+        st.caption('Optional: cache completed sessions from this Grand Prix to disk. Sessions are loaded one at a time and not retained in memory.')
         cacheable = completed_sessions(event)
         if cacheable:
             st.caption('Completed sessions: ' + ', '.join(cacheable))
@@ -152,7 +154,7 @@ if not demo:
                 successes = [x['session'] for x in report if x['status'] == 'cached']
                 failures = [x for x in report if x['status'] != 'cached']
                 if successes:
-                    st.success('Cached: ' + ', '.join(successes))
+                    st.success('Cached to disk: ' + ', '.join(successes))
                 if failures:
                     st.warning('Could not cache: ' + ', '.join(x['session'] for x in failures))
         else:
@@ -259,6 +261,8 @@ if st.button('Generate chart',type='primary',disabled=not can_generate):
     if old_output:
         for fig in old_output.get('_figures',{}).values():
             plt.close(fig)
+        del old_output
+        gc.collect()
     try:
         with st.spinner('Generating chart…'):
             telemetry = None
@@ -280,6 +284,7 @@ if st.button('Generate chart',type='primary',disabled=not can_generate):
                 rendered = {key:png_bytes(fig,dpi=300) for key,fig in result.figures.items()}
                 for fig in result.figures.values():
                     plt.close(fig)
+                gc.collect()
             reported = set()
             for table in result.tables.values():
                 if 'Driver' in table: reported.update(table.Driver.dropna())

@@ -144,24 +144,25 @@ analysis-specific automatic label. PNG exports use the text currently selected i
 
 ## Optional weekend pre-caching
 
-The app loads only the selected session by default. Loading an entire season at startup would
-make launch slow and consume unnecessary memory/network bandwidth. Instead, **Cache management**
-in the sidebar can pre-cache all completed sessions from the selected Grand Prix to FastF1's
-persistent disk cache **and** keep the loaded non-telemetry Session objects in Streamlit's
-resource cache. This avoids reparsing/copying the full FastF1 Session on later reruns and makes
-switching between warmed sessions substantially cheaper while the app process remains alive.
-Telemetry remains lazy and is fetched only when a telemetry-based visualisation needs it.
+The app keeps **only one full FastF1 Session object in process memory at a time**. Loading an entire
+weekend into RAM is deliberately avoided because a 512 MB host can exceed its memory limit quickly.
+**Cache management** in the sidebar can still pre-cache all completed sessions from the selected Grand
+Prix to FastF1's disk cache. Those sessions are loaded one at a time with telemetry disabled and then
+discarded, so later session loads can reuse downloaded files without retaining the whole weekend in RAM.
+Telemetry remains lazy and is loaded into the currently selected session only when a telemetry-based
+visualisation needs it.
 
 ## Hosted-performance behaviour
 
-Loaded FastF1 Session objects use `st.cache_resource` and are treated as read-only. Chart generation
-renders the PNG once at 300 dpi; those same bytes are used for the on-screen preview and the immediate
-**Download PNG** control. This keeps the workflow single-step while avoiding duplicate preview/export
-renders. **Refresh session data** clears both Streamlit data and resource caches.
+Repeated Streamlit reruns for the same selected session reuse one retained FastF1 Session object. When
+the user switches session, the previous object is released before the replacement is loaded and garbage
+collection is requested. Small processed-data caches are also tightly bounded. Chart generation renders
+the PNG once at 300 dpi; those same bytes are used for the on-screen preview and the immediate **Download
+PNG** control. **Refresh session data** clears Streamlit data caches and the retained FastF1 session.
 
 On hosts with ephemeral filesystems, FastF1's disk cache can still disappear after a service restart or
-spin-down. The in-memory resource cache also resets when the process restarts. A persistent disk and an
-always-on service are hosting concerns rather than application requirements.
+spin-down. A persistent disk and an always-on service are hosting concerns rather than application
+requirements.
 
 For lap-time distribution charts, a box-and-whisker summary is shown only when at least five
 representative laps remain for that driver/team. Smaller samples are shown as individual points
