@@ -105,9 +105,13 @@ with st.sidebar:
                      help='Synthetic data for testing the interface. Never use for reporting.')
     if st.button('Refresh session data',help='Clear in-memory caches and refresh on the next load.'):
         st.cache_data.clear()
-        st.session_state.pop('output',None)
-    st.caption('FastF1 3.8.3 · Charts export at 300 dpi')
-    st.caption('First loads may take several minutes. Later loads use a local disk cache.')
+        st.cache_resource.clear()
+        old_output = st.session_state.pop('output',None)
+        if old_output:
+            for fig in old_output.get('_figures',{}).values():
+                plt.close(fig)
+    st.caption('FastF1 3.8.3 · 300 dpi PNG exports')
+    st.caption('First loads can be slow. Loaded sessions are kept in memory for faster reruns and switching.')
 
 columns = st.columns([1,2,1.5])
 year = columns[0].selectbox('Season',catalog.seasons(),key='year')
@@ -138,7 +142,7 @@ name = columns[2].selectbox('Session',session_names,key=f'session-{year}-{round_
 
 if not demo:
     with st.sidebar.expander('Cache management', expanded=False):
-        st.caption('Optional: download the completed sessions from the selected Grand Prix once, so switching between them later is faster.')
+        st.caption('Optional: load completed sessions from this Grand Prix once, warming both the FastF1 disk cache and the in-memory session cache for faster switching.')
         cacheable = completed_sessions(event)
         if cacheable:
             st.caption('Completed sessions: ' + ', '.join(cacheable))
@@ -251,7 +255,10 @@ can_generate = (drivers is None or len(drivers)>0) and (teams is None or len(tea
 if not can_generate:
     st.info('Select at least one '+('team' if analysis.selector=='teams' else 'driver')+'.')
 if st.button('Generate chart',type='primary',disabled=not can_generate):
-    st.session_state.pop('output',None)
+    old_output = st.session_state.pop('output',None)
+    if old_output:
+        for fig in old_output.get('_figures',{}).values():
+            plt.close(fig)
     try:
         with st.spinner('Generating chart…'):
             telemetry = None
@@ -268,10 +275,11 @@ if st.button('Generate chart',type='primary',disabled=not can_generate):
                 result = generate(analysis_key,data,context,drivers,teams,options,
                                   session=None if demo else session,telemetry=telemetry,positions=positions,
                                   chart_text=chart_text)
-                try:
-                    figures = {key:png_bytes(fig) for key,fig in result.figures.items()}
-                finally:
-                    for fig in result.figures.values(): plt.close(fig)
+                # Render once at publication/export resolution. The same PNG bytes
+                # are used for the on-screen preview and the immediate download.
+                rendered = {key:png_bytes(fig,dpi=300) for key,fig in result.figures.items()}
+                for fig in result.figures.values():
+                    plt.close(fig)
             reported = set()
             for table in result.tables.values():
                 if 'Driver' in table: reported.update(table.Driver.dropna())
@@ -279,7 +287,8 @@ if st.button('Generate chart',type='primary',disabled=not can_generate):
             if missing: result.notes.append('No usable observations for this analysis: '+', '.join(missing))
             if demo:
                 result.notes.insert(0,'SYNTHETIC DEMONSTRATION — not real session data.')
-            st.session_state.output = dict(signature=signature,figures=figures,tables=result.tables,notes=result.notes,
+            st.session_state.output = dict(signature=signature,figures=rendered,
+                                          tables=result.tables,notes=result.notes,
                                           metadata={'context':context,'analysis':analysis_key,'drivers':drivers,'teams':teams,
                                                     'filters':asdict(options),'chart_text':chart_text,'synthetic':demo,'fastf1':'3.8.3',
                                                     'generated_at_utc':pd.Timestamp.now(tz='UTC').isoformat(),
@@ -309,7 +318,7 @@ if output and output['signature']==signature:
                     shown_notes.add(friendly)
         for key,png in output['figures'].items():
             st.image(png,use_container_width=True)
-            st.download_button('Download PNG · 300 dpi',png,f'{slug}-{key}.png','image/png',key='png-'+key)
+            st.download_button('Download PNG',png,f'{slug}-{key}.png','image/png',key='png-'+key)
     with data_tab:
         for key,table in output['tables'].items():
             st.subheader(key.replace('-',' ').title())

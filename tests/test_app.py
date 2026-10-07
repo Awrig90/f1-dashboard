@@ -34,7 +34,9 @@ def test_workflow_all_analyses_and_stale_results():
                 assert not at.error, [e.value for e in at.error]
                 assert len(at.get('imgs'))>0 or 'output' in at.session_state
                 assert at.session_state.output['tables']
+                # PNG, CSV and context downloads are available immediately.
                 assert len(at.get('download_button'))>=3
+                assert any(x.label=='Download PNG' for x in at.get('download_button'))
         selector(at,'Session').set_value('Qualifying').run()
         assert len(at.get('download_button'))==0
         assert 'Position Tracker' not in selector(at,'Visualisation').options

@@ -269,7 +269,11 @@ def compound_legend(ax, compounds, style):
     ax.legend(handles=[Patch(facecolor=style.color(c,'compound'),edgecolor='#777',label=c) for c in compounds],
               bbox_to_anchor=(1.01,1),loc='upper left',fontsize=8)
 
-def png_bytes(fig):
+def png_bytes(fig, dpi=300):
+    """Render a figure to PNG bytes at the requested resolution.
+
+    The dashboard renders its downloadable chart output at 300 dpi.
+    """
     output = BytesIO()
-    fig.savefig(output,format='png',dpi=300,bbox_inches='tight',facecolor='white')
+    fig.savefig(output,format='png',dpi=dpi,bbox_inches='tight',facecolor='white')
     return output.getvalue()

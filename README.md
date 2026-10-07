@@ -147,9 +147,21 @@ analysis-specific automatic label. PNG exports use the text currently selected i
 The app loads only the selected session by default. Loading an entire season at startup would
 make launch slow and consume unnecessary memory/network bandwidth. Instead, **Cache management**
 in the sidebar can pre-cache all completed sessions from the selected Grand Prix to FastF1's
-persistent disk cache. This speeds up later switching between practice, qualifying and race
-sessions from the same weekend. Telemetry remains lazy and is fetched only when a telemetry-based
-visualisation needs it.
+persistent disk cache **and** keep the loaded non-telemetry Session objects in Streamlit's
+resource cache. This avoids reparsing/copying the full FastF1 Session on later reruns and makes
+switching between warmed sessions substantially cheaper while the app process remains alive.
+Telemetry remains lazy and is fetched only when a telemetry-based visualisation needs it.
+
+## Hosted-performance behaviour
+
+Loaded FastF1 Session objects use `st.cache_resource` and are treated as read-only. Chart generation
+renders the PNG once at 300 dpi; those same bytes are used for the on-screen preview and the immediate
+**Download PNG** control. This keeps the workflow single-step while avoiding duplicate preview/export
+renders. **Refresh session data** clears both Streamlit data and resource caches.
+
+On hosts with ephemeral filesystems, FastF1's disk cache can still disappear after a service restart or
+spin-down. The in-memory resource cache also resets when the process restarts. A persistent disk and an
+always-on service are hosting concerns rather than application requirements.
 
 For lap-time distribution charts, a box-and-whisker summary is shown only when at least five
 representative laps remain for that driver/team. Smaller samples are shown as individual points

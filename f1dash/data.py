@@ -22,9 +22,10 @@ def schedule(year):
         raise NoData('The event schedule could not be loaded. Check your internet connection, '
                      'try again, or choose another season.') from exc
 
-@st.cache_data(ttl=3600, max_entries=4, show_spinner=False)
+@st.cache_resource(ttl=3600, max_entries=10, show_spinner=False)
 def session_data(year, round_number, name, telemetry=False):
-    # cache_data returns isolated copies; no mutable Session shared between users.
+    # A loaded FastF1 Session is expensive to pickle/copy on every Streamlit rerun.
+    # Keep the object in the process resource cache and treat it as read-only.
     try:
         session = fastf1.get_session(year, round_number, name)
         session.load(telemetry=telemetry, weather=False, messages=True)
@@ -106,17 +107,17 @@ def roster(session, d):
 
 
 def precache_weekend(year, round_number, session_names):
-    """Warm FastF1's persistent disk cache for completed sessions in one weekend.
+    """Warm both FastF1's disk cache and the in-process loaded-session cache.
 
     Telemetry is deliberately excluded: timing/lap data are the common path and
-    telemetry is much larger. A telemetry plot will fetch/cache it on demand.
-    This function bypasses Streamlit's in-memory Session cache on purpose.
+    telemetry is much larger. A telemetry plot still fetches/cache it on demand.
+    Keeping completed weekend sessions as Streamlit resources makes later session
+    switches avoid reparsing/copying the full FastF1 Session object.
     """
     report = []
     for name in session_names:
         try:
-            session = fastf1.get_session(year, round_number, name)
-            session.load(telemetry=False, weather=False, messages=False)
+            session_data(year, round_number, name, telemetry=False)
             report.append({'session': name, 'status': 'cached'})
         except Exception as exc:
             log.exception('Weekend pre-cache failed: %s %s %s', year, round_number, name)

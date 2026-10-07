@@ -22,3 +22,16 @@ Restart with your existing launcher. Restarting clears the old in-memory Streaml
 The main selectors, nine analyses, tabs, downloads and module architecture are retained.
 
 See `docs/AUDIT.md` and `docs/METHODOLOGY.md` for the findings and exact definitions.
+
+
+## Hosted performance update
+
+This package also includes a responsiveness pass for low-CPU hosting:
+
+- loaded FastF1 Session objects now use Streamlit's resource cache instead of being serialized/copied via `st.cache_data` on each rerun;
+- **Pre-cache selected weekend** now warms the in-process loaded-session cache as well as FastF1's disk cache;
+- charts render once at 300 dpi and the same PNG bytes are used for display and download;
+- 300 dpi PNGs are generated with the chart and are immediately available via **Download PNG**;
+- **Refresh session data** clears both data and resource caches.
+
+These changes do not alter analytical definitions or chart calculations. Telemetry remains lazy. Resource-cached Session objects are treated as read-only.
