@@ -212,7 +212,7 @@ def generate(key, d, context, drivers=None, teams=None, options=p.FilterOptions(
             left += values
         ax.invert_yaxis(); ax.set_xlabel('Completed recorded laps (includes pit and slow laps)')
         compound_legend(ax,usage.columns,style)
-        r.figures[key] = finish(fig,'Completed recorded laps include untimed outlaps; pace metrics use separate filters.')
+        r.figures[key] = finish(fig,'Completed recorded laps include untimed outlaps; pace metrics use separate filters.\n' + scope_caption(options))
         r.tables['compound-performance'] = table.sort_values(['Driver','FastestSeconds'])
         r.notes.append('Usage includes recorded lap completions even when LapTime is missing. FastestSeconds uses known-valid timed laps; MedianSeconds uses representative laps. Deltas reference the full-session confirmed personal best, across all compounds. Unknown deletion status is not silently accepted.')
     elif key == 'sectors':
@@ -275,7 +275,12 @@ def generate(key, d, context, drivers=None, teams=None, options=p.FilterOptions(
 def filter_caption(options):
     speed = f'≤ {options.threshold*100:.0f}% of driver/compound best' if options.quick else 'No quick-lap cutoff'
     flags = 'green track only' if options.green_only else 'green/yellow laps passing FastF1 accuracy checks'
-    return speed+'; '+flags
+    return speed+'; '+flags+'\n'+scope_caption(options)
+
+def scope_caption(options):
+    scope = 'All compounds' if options.compounds is None else 'Compounds: ' + ', '.join(options.compounds)
+    laps = f'lap range {options.lap_min or 1}–{options.lap_max or "end"} (inclusive)'
+    return scope+'; '+laps
 
 def compound_legend(ax, compounds, style):
     ax.legend(handles=[Patch(facecolor=style.color(c,'compound'),edgecolor='#777',label=c) for c in compounds],
@@ -289,3 +294,4 @@ def png_bytes(fig, dpi=300):
     output = BytesIO()
     fig.savefig(output,format='png',dpi=dpi,facecolor='white')
     return output.getvalue()
+

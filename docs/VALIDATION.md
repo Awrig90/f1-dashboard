@@ -1,5 +1,9 @@
 # Validation record
 
+## 9 October 2026 loading and filters follow-up
+
+See [LOADING_VALIDATION.md](LOADING_VALIDATION.md) for the current loading-path validation, real-session retention comparison, telemetry comparison and measured process memory. This supersedes the outstanding selective-telemetry validation gap below. The baseline suite grew from 45 to 52 tests; new checks cover race-control loading, absolute telemetry timing, exact compound/lap scope and Streamlit controls.
+
 ## Accuracy audit update (supersedes the original correctness claims)
 
 The focused review adds data-value assertions and frozen real-source regressions. **43 tests pass**, including all 20 supplied Spanish qualifying fastest-lap times/deltas and the Bahrain reported-position sequence. See `AUDIT.md`, `METHODOLOGY.md` and `evidence/audit-validation.json` for exact checks and limitations. The original test results below establish the initial runtime baseline; they did not independently validate race-position semantics.
@@ -57,4 +61,5 @@ low-memory build keeps the same lap-based calculations, but no longer retains a 
 uses a selective raw-stream path for Speed on Track Map. That telemetry path has deterministic unit coverage
 in this package but still needs one live side-by-side regression against the previously validated 2024
 Bahrain qualifying map when deployed somewhere that can reach FastF1.
+
 
