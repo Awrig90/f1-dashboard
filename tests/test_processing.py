@@ -100,3 +100,28 @@ def test_compound_usage_survives_no_valid_laps(laps):
     assert table.LapsCompleted.sum()==len(laps)
     assert table.ValidLaps.eq(0).all()
     assert table.FastestSeconds.isna().all()
+
+
+
+def test_compound_and_lap_scope_is_inclusive_and_counts_agree(laps):
+    options = p.FilterOptions(quick=False, compounds=('MEDIUM',), lap_min=2, lap_max=5)
+    q = p.representative(laps, options)
+    assert set(q.Compound) == {'MEDIUM'}
+    assert set(q.LapNumber) == {2, 3, 4, 5}
+    counts = p.retention_table(laps, options)
+    assert counts.InSelectedScope.eq(4).all()
+    assert counts.RepresentativeLaps.eq(4).all()
+    table = p.compound_usage(laps, options=options)
+    assert table.LapsCompleted.eq(4).all()
+    assert table.RepresentativeLaps.eq(4).all()
+    assert table.BenchmarkSeconds.eq(p.fastest(laps).BenchmarkSeconds.iloc[0]).all()
+    assert p.representative(laps, p.FilterOptions(compounds=())).empty
+    assert p.representative(laps, p.FilterOptions(lap_min=100)).empty
+
+
+def test_scoped_quick_cutoff_uses_selected_laps(laps):
+    d = laps.query("Driver == 'NOR'").copy()
+    d.loc[d.LapNumber.isin([2, 3]), 'LapTimeSeconds'] = [140, 145]
+    options = p.FilterOptions(compounds=('MEDIUM',), lap_min=2, lap_max=3)
+    assert set(p.representative(d, options).LapNumber) == {2, 3}
+    assert not set(p.representative(d).LapNumber).intersection({2, 3})

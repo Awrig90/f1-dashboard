@@ -11,11 +11,14 @@ class FilterOptions:
     quick: bool = True
     threshold: float = 1.07
     green_only: bool = True
+    compounds: tuple[str, ...] | None = None
+    lap_min: int | None = None
+    lap_max: int | None = None
 
 TIME_COLUMNS = ('LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time')
 LAP_SOURCE_COLUMNS = (
     'Driver', 'DriverNumber', 'Team', 'Compound', 'LapNumber', 'Stint', 'Position',
-    'LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time', 'LapStartDate',
+    'LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time', 'LapStartDate', 'LapStartTime',
     'PitInTime', 'PitOutTime', 'Time', 'IsPersonalBest', 'Deleted',
     'FastF1Generated', 'IsAccurate', 'TrackStatus'
 )
@@ -32,7 +35,7 @@ def normalize(laps):
                                   if col in d else np.nan)
     defaults = {'Driver': None, 'DriverNumber': None, 'Team': 'Unknown', 'Compound': 'UNKNOWN',
                 'LapNumber': np.nan, 'Stint': np.nan, 'Position': np.nan,
-                'LapStartDate': pd.NaT, 'PitInTime': pd.NaT, 'PitOutTime': pd.NaT,
+                'LapStartDate': pd.NaT, 'LapStartTime': pd.NaT, 'PitInTime': pd.NaT, 'PitOutTime': pd.NaT,
                 'Time': pd.NaT, 'IsPersonalBest': False,
                 'Deleted': pd.NA, 'FastF1Generated': False, 'IsAccurate': False,
                 'TrackStatus': ''}
@@ -69,8 +72,20 @@ def personal_bests(d):
     q = valid_laps(d)
     return q.loc[q.IsPersonalBest.fillna(False).astype(bool)].copy()
 
+def lap_scope(d, options=FilterOptions()):
+    """Inclusive lap-number range and exact compound selection; empty means none."""
+    q = d
+    if options.compounds is not None:
+        q = q.loc[q.Compound.isin(options.compounds)]
+    if options.lap_min is not None:
+        q = q.loc[q.LapNumber.ge(options.lap_min)]
+    if options.lap_max is not None:
+        q = q.loc[q.LapNumber.le(options.lap_max)]
+    return q.copy()
+
+
 def representative(d, options=FilterOptions()):
-    q = valid_laps(d)
+    q = valid_laps(lap_scope(d, options))
     q = q.loc[q.IsAccurate.fillna(False).astype(bool)
               & q.PitInTime.isna() & q.PitOutTime.isna()].copy()
     if options.green_only:
@@ -108,11 +123,12 @@ def summary(q, group='Driver'):
 
 def compound_usage(d, drivers=None, options=FilterOptions()):
     # Count completed, recorded laps (including pit/slow/deleted laps), not synthetic rows.
-    completed = observed_laps(d)
+    scoped = lap_scope(d, options)
+    completed = observed_laps(scoped)
     # A completed outlap can have a lap-end timestamp but no measured LapTime.
     completed = completed.loc[completed.Time.notna() | completed.LapTimeSeconds.gt(0)]
     counts = completed.groupby(['Driver', 'Compound']).agg(LapsCompleted=('LapNumber', 'nunique'))
-    v = valid_laps(d)
+    v = valid_laps(scoped)
     pb = personal_bests(d)
     best = pb.loc[pb.LapTimeSeconds.idxmin()] if not pb.empty else None
     pace = v.groupby(['Driver', 'Compound']).agg(ValidLaps=('LapTimeSeconds', 'size'),
@@ -169,10 +185,12 @@ def stint_table(d, drivers=None):
 
 def retention_table(d, options=FilterOptions()):
     """Auditable denominators; stages are nested, not overlapping reasons."""
-    stages = [('SourceRows', d), ('UnambiguousObservedLaps', observed_laps(d)),
-              ('ValidTimedLaps', valid_laps(d)),
-              ('AccurateNonPitLaps', representative(d, FilterOptions(False, options.threshold, False))),
-              ('BeforeQuickCutoff', representative(d, FilterOptions(False, options.threshold, options.green_only))),
+    scoped = lap_scope(d, options)
+    stages = [('SourceRows', d), ('InSelectedScope', scoped),
+              ('UnambiguousObservedLaps', observed_laps(scoped)),
+              ('ValidTimedLaps', valid_laps(scoped)),
+              ('AccurateNonPitLaps', representative(scoped, FilterOptions(False, options.threshold, False))),
+              ('BeforeQuickCutoff', representative(scoped, FilterOptions(False, options.threshold, options.green_only))),
               ('RepresentativeLaps', representative(d, options))]
     out = pd.DataFrame(index=sorted(d.Driver.unique()))
     for name, rows in stages:
@@ -217,3 +235,4 @@ def csv_bytes(df):
             out[col] = out[col].dt.total_seconds()
             out = out.rename(columns={col: col + '_seconds'})
     return out.to_csv(index=False, float_format='%.6f').encode('utf-8-sig')
+

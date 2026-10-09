@@ -187,6 +187,8 @@ try:
             results = snapshot['results']
             styles = snapshot.get('styles')
             session = None
+            if snapshot.get('unknown_deleted_laps', 0):
+                st.warning('Deletion status is unavailable for some laps. Those laps are excluded from pace comparisons unless individually confirmed as personal bests; the sample may be incomplete.')
 except p.NoData as exc:
     st.info(str(exc)); st.stop()
 all_drivers, labels = roster(results,data)
@@ -216,7 +218,19 @@ if analysis.filtering:
         st.caption('Pit laps, deleted laps, generated laps and inaccurate timing are excluded. '
                    'Turning off green-only permits yellow-flag laps that pass FastF1 accuracy checks, not SC/VSC laps. '
                    'Disable the slow-lap cutoff when conditions change substantially, including within one compound.')
-        options = p.FilterOptions(quick,threshold/100,green)
+        compounds = sorted(data.Compound.dropna().unique().tolist())
+        chosen_compounds = st.multiselect('Compounds', compounds, default=compounds, key='compounds-'+scope)
+        lap_numbers = pd.to_numeric(data.LapNumber, errors='coerce').dropna()
+        lap_numbers = lap_numbers.loc[lap_numbers.gt(0) & lap_numbers.mod(1).eq(0)]
+        lap_min = lap_max = None
+        if not lap_numbers.empty:
+            first, last = int(lap_numbers.min()), int(lap_numbers.max())
+            if first < last:
+                lap_min, lap_max = st.slider('Lap range (inclusive)', first, last, (first, last), key='lap-range-'+scope)
+            else:
+                lap_min = lap_max = first
+        st.caption('Compound and lap range apply to pace samples and compound usage. The slow-lap cutoff is calculated within this selection; compound deltas still use the full-session best.')
+        options = p.FilterOptions(quick,threshold/100,green,tuple(chosen_compounds),lap_min,lap_max)
 
 if analysis_key=='teams' and catalog.session_kind(name)=='practice':
     st.info('Practice lap-time distribution: these laps do not establish true race pace or fuel-corrected performance.')
@@ -355,3 +369,4 @@ elif output:
     st.caption('Your selection has changed. Generate a new chart to update the result.')
 else:
     st.caption('Set your options, then select Generate chart. Exports appear with the result.')
+

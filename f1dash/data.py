@@ -118,10 +118,9 @@ def _load_snapshot(year, round_number, name):
         if rss is not None:
             log.info('Memory before FastF1 load: %.1f MB RSS', rss)
         session = fastf1.get_session(year, round_number, name)
-        # No telemetry/weather/race-control messages are needed for the core
-        # lap-based charts. Position history and telemetry have separate lean
-        # on-demand paths below.
-        session.load(telemetry=False, weather=False, messages=False)
+        # Race-control messages populate Deleted and correct IsPersonalBest.
+        # Telemetry/weather remain off; speed and position use on-demand paths.
+        session.load(telemetry=False, weather=False, messages=True)
         if session.laps.empty:
             raise NoData('No lap data is available. The session may not have started, may have '
                          'been cancelled, or its timing data may not yet be published.')
@@ -129,7 +128,8 @@ def _load_snapshot(year, round_number, name):
         results = _results_frame(session)
         styles = _style_maps(session, data, results)
         api_path = str(session.api_path)
-        return {'data': data, 'results': results, 'styles': styles, 'api_path': api_path}
+        return {'data': data, 'results': results, 'styles': styles, 'api_path': api_path,
+                'unknown_deleted_laps': int(data.Deleted.isna().sum())}
     finally:
         session = None
         _release_memory('releasing full FastF1 session')
@@ -161,93 +161,73 @@ def _naive_utc(value):
     return ts
 
 
-def _decode_driver_car(api_path, driver_number, start, end, pad_seconds=1.0):
-    """Decode only one driver's speed samples from the compressed car stream."""
+def _decode_driver_stream(api_path, driver_number, stream, start=None, end=None, pad_seconds=1.0):
+    """Scan official packets, retaining one driver's required channels only.
+
+    The maximum Date - packet Time across both streams is FastF1 3.8.3's
+    session-zero offset. Scan the whole stream so a late low-latency packet is
+    not missed. No full-field telemetry frames are materialised. fetch_page
+    still downloads the full compressed stream; loading peak is not bounded.
+    """
     from fastf1 import _api
+    from fastf1.utils import to_datetime, to_timedelta
+    is_car = stream == 'car_data'
+    columns = ['Date', 'Speed'] if is_car else ['Date', 'X', 'Y']
+    required = ('0', '2', '3', '4', '5') if is_car else ('X', 'Y', 'Z')
+    rows, offset, failures = [], None, 0
     response = None
-    rows = []
-    lower = start - pd.Timedelta(seconds=pad_seconds)
-    upper = end + pd.Timedelta(seconds=pad_seconds)
-    drv = str(driver_number)
     try:
-        response = _api.fetch_page(api_path, 'car_data')
+        response = _api.fetch_page(api_path, stream)
         if not response:
-            raise NoData('Car telemetry is unavailable for this session.')
+            raise NoData('Telemetry stream is unavailable for this session.')
         for record in response:
             try:
-                jrecord = _api.parse(record[12:], zipped=True)
-                finished = False
-                for entry in jrecord.get('Entries', []):
-                    date = _naive_utc(entry.get('Utc'))
-                    if pd.isna(date):
+                packet_time = pd.Timedelta(to_timedelta(record[:12]))
+                packet = _api.parse(record[12:], zipped=True)
+                for entry in packet.get('Entries' if is_car else 'Position', []):
+                    date = pd.Timestamp(to_datetime(entry['Utc' if is_car else 'Timestamp']))
+                    if pd.isna(date) or pd.isna(packet_time):
                         continue
-                    if date < lower:
+                    entries = entry.get('Cars' if is_car else 'Entries', {})
+                    channels = [v.get('Channels', {}) if is_car else v for v in entries.values()]
+                    if any(all(k in value for k in required) for value in channels):
+                        candidate = date - packet_time
+                        offset = candidate if offset is None else max(offset, candidate)
+                    selected = entries.get(str(driver_number), {})
+                    selected = selected.get('Channels', {}) if is_car else selected
+                    if not all(k in selected for k in required):
                         continue
-                    if date > upper:
-                        finished = True
-                        break
-                    car = entry.get('Cars', {}).get(drv)
-                    if not car:
+                    if start is not None and date < start - pd.Timedelta(seconds=pad_seconds):
                         continue
-                    channels = car.get('Channels', {})
-                    if '2' not in channels:
+                    if end is not None and date > end + pd.Timedelta(seconds=pad_seconds):
                         continue
-                    rows.append((date, pd.to_numeric(channels.get('2'), errors='coerce')))
-                if finished and rows:
-                    break
-            except Exception:
-                continue
+                    values = [selected['2']] if is_car else [selected['X'], selected['Y']]
+                    rows.append((date, *values))
+            except (ValueError, TypeError, KeyError, AttributeError):
+                failures += 1
+        if failures:
+            log.warning('%s: skipped %s malformed telemetry packets', stream, failures)
     finally:
         response = None
-        _release_memory('decoding selected-driver car telemetry')
-    out = pd.DataFrame(rows, columns=['Date', 'Speed'])
+        _release_memory('decoding selected-driver ' + stream)
+    out = pd.DataFrame(rows, columns=columns)
+    for col in columns[1:]:
+        out[col] = pd.to_numeric(out[col], errors='coerce')
+    # Match Session._load_telemetry: offset uses raw dates, samples use ms dates.
+    out['Date'] = pd.to_datetime(out['Date']).dt.round('ms')
+    out = out.dropna().drop_duplicates('Date').sort_values('Date')
     if out.empty:
-        raise NoData('Speed telemetry is unavailable for this driver’s fastest valid lap.')
-    return out.dropna(subset=['Date', 'Speed']).drop_duplicates('Date').sort_values('Date')
+        raise NoData('Telemetry is unavailable for the selected driver.')
+    out.attrs['t0_date'] = offset
+    return out
 
 
-def _decode_driver_position(api_path, driver_number, start, end, pad_seconds=1.0):
-    """Decode only one driver's X/Y samples from the compressed position stream."""
-    from fastf1 import _api
-    response = None
-    rows = []
-    lower = start - pd.Timedelta(seconds=pad_seconds)
-    upper = end + pd.Timedelta(seconds=pad_seconds)
-    drv = str(driver_number)
-    try:
-        response = _api.fetch_page(api_path, 'position')
-        if not response:
-            raise NoData('Position telemetry is unavailable for this session.')
-        for record in response:
-            try:
-                jrecord = _api.parse(record[12:], zipped=True)
-                finished = False
-                for sample in jrecord.get('Position', []):
-                    date = _naive_utc(sample.get('Timestamp'))
-                    if pd.isna(date):
-                        continue
-                    if date < lower:
-                        continue
-                    if date > upper:
-                        finished = True
-                        break
-                    pos = sample.get('Entries', {}).get(drv)
-                    if not pos:
-                        continue
-                    x = pd.to_numeric(pos.get('X'), errors='coerce')
-                    y = pd.to_numeric(pos.get('Y'), errors='coerce')
-                    rows.append((date, x, y))
-                if finished and rows:
-                    break
-            except Exception:
-                continue
-    finally:
-        response = None
-        _release_memory('decoding selected-driver position telemetry')
-    out = pd.DataFrame(rows, columns=['Date', 'X', 'Y'])
-    if out.empty:
-        raise NoData('Position telemetry is unavailable for this driver’s fastest valid lap.')
-    return out.dropna(subset=['Date', 'X', 'Y']).drop_duplicates('Date').sort_values('Date')
+def _decode_driver_car(api_path, driver_number, start=None, end=None, pad_seconds=1.0):
+    return _decode_driver_stream(api_path, driver_number, 'car_data', start, end, pad_seconds)
+
+
+def _decode_driver_position(api_path, driver_number, start=None, end=None, pad_seconds=1.0):
+    return _decode_driver_stream(api_path, driver_number, 'position', start, end, pad_seconds)
 
 
 @st.cache_data(ttl=3600, max_entries=1, show_spinner=False)
@@ -266,9 +246,12 @@ def fastest_telemetry(year, round_number, name, driver):
     best = d.sort_values('LapTimeSeconds').iloc[0]
     start = _naive_utc(best.get('LapStartDate'))
     seconds = float(best.LapTimeSeconds)
-    if pd.isna(start) or not np.isfinite(seconds) or seconds <= 0:
-        raise NoData('The fastest lap has no usable absolute lap timing for telemetry slicing.')
-    end = start + pd.Timedelta(seconds=seconds)
+    if not np.isfinite(seconds) or seconds <= 0:
+        raise NoData('The fastest lap has no usable lap duration for telemetry slicing.')
+    relative_start = pd.to_timedelta(best.get('LapStartTime'), errors='coerce')
+    if pd.isna(start) and pd.isna(relative_start):
+        raise NoData('The fastest lap has no usable start timing for telemetry slicing.')
+    end = start + pd.Timedelta(seconds=seconds) if pd.notna(start) else None
     driver_number = best.get('DriverNumber')
     if pd.isna(driver_number) or str(driver_number).strip() in ('', 'nan', 'None'):
         results = snapshot['results']
@@ -280,8 +263,15 @@ def fastest_telemetry(year, round_number, name, driver):
         raise NoData('The selected driver’s timing number is unavailable for telemetry lookup.')
 
     try:
-        car = _decode_driver_car(snapshot['api_path'], driver_number, start, end)
-        pos = _decode_driver_position(snapshot['api_path'], driver_number, start, end)
+        car = _decode_driver_car(snapshot['api_path'], driver_number, start if pd.notna(start) else None, end)
+        pos = _decode_driver_position(snapshot['api_path'], driver_number, start if pd.notna(start) else None, end)
+        if pd.isna(start):
+            offsets = [frame.attrs.get('t0_date') for frame in (car, pos)]
+            offsets = [value for value in offsets if value is not None and pd.notna(value)]
+            if not offsets:
+                raise NoData('Telemetry has no usable session timestamp offset.')
+            start = max(offsets).round('ms') + relative_start
+            end = start + pd.Timedelta(seconds=seconds)
         # Keep only original car samples from the timed lap itself. Position is
         # interpolated by timestamp between the surrounding official samples.
         car = car.loc[car.Date.between(start, end)].copy()
@@ -372,7 +362,7 @@ def precache_weekend(year, round_number, session_names):
         session = None
         try:
             session = fastf1.get_session(year, round_number, session_name)
-            session.load(telemetry=False, weather=False, messages=False)
+            session.load(telemetry=False, weather=False, messages=True)
             if session.laps.empty:
                 raise NoData('No lap data is available.')
             report.append({'session': session_name, 'status': 'cached'})
@@ -383,3 +373,4 @@ def precache_weekend(year, round_number, session_names):
             session = None
             _release_memory(f'pre-caching {session_name}')
     return report
+

@@ -169,3 +169,8 @@ requirements.
 For lap-time distribution charts, a box-and-whisker summary is shown only when at least five
 representative laps remain for that driver/team. Smaller samples are shown as individual points
 without a distribution box.
+
+
+## Loading correctness and comparison filters
+
+Race-control messages are loaded for deletion-status eligibility. Pace and compound-usage views expose compound selection and inclusive lap ranges in Representative-lap filters; exports record their scope. Speed maps recover absolute lap timing without retaining a full-field telemetry Session. See [loading validation](docs/LOADING_VALIDATION.md) for real-session results, memory measurements and remaining hosting limits.

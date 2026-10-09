@@ -1,0 +1,79 @@
+{
+  "mode": "baseline",
+  "source": "cached official data",
+  "python": "3.12.14",
+  "fastf1": "3.8.3",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "baseline_rss_mib": 158.78515625,
+  "stages": {
+    "2024-1-Practice 2": {
+      "rows": 511,
+      "unknown_deleted": 511,
+      "deleted": 0,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 511,
+        "InSelectedScope": 511,
+        "UnambiguousObservedLaps": 511,
+        "ValidTimedLaps": 54,
+        "AccurateNonPitLaps": 54,
+        "BeforeQuickCutoff": 54,
+        "RepresentativeLaps": 52
+      },
+      "peak_rss_mib": 163.33203125,
+      "rss_mib": 163.5703125
+    },
+    "2024-1-Qualifying": {
+      "rows": 267,
+      "unknown_deleted": 267,
+      "deleted": 0,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 267,
+        "InSelectedScope": 267,
+        "UnambiguousObservedLaps": 267,
+        "ValidTimedLaps": 81,
+        "AccurateNonPitLaps": 81,
+        "BeforeQuickCutoff": 81,
+        "RepresentativeLaps": 81
+      },
+      "peak_rss_mib": 163.70703125,
+      "rss_mib": 163.8984375
+    },
+    "2024-1-Race": {
+      "rows": 1129,
+      "unknown_deleted": 1129,
+      "deleted": 0,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 1129,
+        "InSelectedScope": 1129,
+        "UnambiguousObservedLaps": 1129,
+        "ValidTimedLaps": 129,
+        "AccurateNonPitLaps": 129,
+        "BeforeQuickCutoff": 129,
+        "RepresentativeLaps": 129
+      },
+      "peak_rss_mib": 168.45703125,
+      "rss_mib": 168.69921875
+    },
+    "2024-5-Sprint": {
+      "rows": 378,
+      "unknown_deleted": 378,
+      "deleted": 0,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 378,
+        "InSelectedScope": 378,
+        "UnambiguousObservedLaps": 378,
+        "ValidTimedLaps": 67,
+        "AccurateNonPitLaps": 67,
+        "BeforeQuickCutoff": 67,
+        "RepresentativeLaps": 67
+      },
+      "peak_rss_mib": 168.45703125,
+      "rss_mib": 168.69921875
+    }
+  },
+  "peak_rss_mib": 168.45703125
+}

@@ -50,3 +50,24 @@ def test_schedule_failure_human_readable():
         assert not at.exception
         button(at,'Generate chart').click().run()
         assert at.session_state.output['metadata']['synthetic'] is True
+
+
+
+def test_pace_scope_controls_change_tables_and_export_context():
+    with patch('f1dash.data.schedule', return_value=EVENTS), \
+         patch('f1dash.data.session_snapshot', return_value={'data': normalize(demo_session().laps), 'results': demo_session().results, 'styles': {}, 'api_path': '/test/'}):
+        at = AppTest.from_file(APP, default_timeout=30).run()
+        selector(at, 'Visualisation').set_value('drivers').run()
+        next(w for w in at.multiselect if w.label == 'Compounds').set_value(['MEDIUM']).run()
+        next(w for w in at.slider if w.label == 'Lap range (inclusive)').set_value((2, 5)).run()
+        button(at, 'Generate chart').click().run()
+        assert not at.exception and not at.error
+        q = at.session_state.output['tables']['representative-laps']
+        assert set(q.Compound) == {'MEDIUM'} and set(q.LapNumber) == {2, 3, 4, 5}
+        filters = at.session_state.output['metadata']['filters']
+        assert filters['compounds'] == ('MEDIUM',) and filters['lap_min'] == 2 and filters['lap_max'] == 5
+        next(w for w in at.multiselect if w.label == 'Compounds').set_value([]).run()
+        assert len(at.get('download_button')) == 0
+        button(at, 'Generate chart').click().run()
+        assert not at.exception and not at.error
+        assert any('No usable laps' in x.value for x in at.info)

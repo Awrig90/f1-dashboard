@@ -8,15 +8,19 @@ All calculations use copies of source data. Lap/sector timedeltas become explici
 
 **Observed lap:** positive integer LapNumber, no conflicting duplicate, not FastF1Generated. A source-observed lap is not necessarily a valid timed or clean racing lap.
 
+**Loading requirement:** Timing snapshots and weekend pre-cache load race-control messages (`messages=True`), with telemetry and weather disabled. FastF1 uses those messages to populate `Deleted` and correct `IsPersonalBest`. Unknown deletion status is surfaced in the UI; it is never filled with False.
+
 **Valid timed lap:** observed; finite positive LapTime; `Deleted=False`. If Deleted is unknown, an explicit `IsPersonalBest=True` can establish eligibility for that particular lap. An explicit deletion always wins. This is a conservative source-data definition, not an independent FIA validity ruling.
 
 **Confirmed personal best (PB):** valid timed lap and IsPersonalBest=True. This reproduces the supplied tutorials' `pick_fastest()` flag requirement. If no confirmed PB exists, no ordinary minimum is silently substituted. Ties retain source order. A driver may have multiple PB-flagged laps as their times improved; the minimum of those is used.
 
 **Representative lap:** valid timed, IsAccurate=True, PitInTime and PitOutTime absent. By default TrackStatus must equal `1` (green only). Disabling green-only still requires IsAccurate: FastF1 itself only admits green/yellow status combinations, consistent sector sums and timing differences, and excludes certain laps following a safety car. Thus this switch does NOT enable SC/VSC or arbitrary inaccurate laps.
 
+For Driver Lap Times, driver/team distributions and Practice Compound Usage, an optional exact compound selection and inclusive lap-number range are applied first. Empty compound selection means no laps. These controls do not change fastest-lap, sector, strategy, position or speed-map populations. Compound usage counts and pace metrics share the selected scope, while compound deltas retain the full-session PB benchmark.
+
 The optional quick filter retains LapTime ≤ 1.07 × the minimum retained lap within each driver/compound group (adjustable 1.01–1.30). This differs from tutorial `pick_quicklaps()`, which applies a strict `<` threshold to the fastest lap of whatever selection it receives. Group-specific filtering avoids comparing wet compounds against dry times, but remains a selected sample, not a race-pace model. Even a single compound can span changing weather, fuel, traffic and run plans. Disabling the quick cutoff does not disable validity/accuracy/pit filters.
 
-`filter-retention` exports nested row counts per driver: source → unambiguous observed → valid timed → accurate non-pit → track-status eligible → quick-filter retained. These are denominators, not mutually exclusive reasons. Team analyses retain the full-session driver audit so omissions can be inspected.
+`filter-retention` exports nested row counts per driver: source → selected compound/lap scope → unambiguous observed → valid timed → accurate non-pit → track-status eligible → quick-filter retained. These are denominators, not mutually exclusive reasons. Team analyses retain the full-session driver audit so omissions can be inspected.
 
 ## 1. Session Fastest Laps
 
@@ -70,11 +74,11 @@ The optional quick filter retains LapTime ≤ 1.07 × the minimum retained lap w
 
 ## 7. Speed on Track Map
 
-**Fields:** PB selection fields from analysis 1 plus `DriverNumber` and `LapStartDate`; FastF1 3.8.3 raw car-data `Date`/`Speed` samples and raw position-data `Date`/`X`/`Y` samples for the selected driver and lap window.
+**Fields:** PB selection fields from analysis 1 plus `DriverNumber`, `LapStartTime` and, when already available, `LapStartDate`; FastF1 3.8.3 raw car-data `Date`/`Speed` samples and raw position-data `Date`/`X`/`Y` samples for the selected driver and lap window.
 
-**Calculation:** select one driver's fastest confirmed PB; do not silently choose a slower lap if its telemetry fails. To avoid materialising full-field telemetry on small hosted instances, decode only that driver's compressed car/position stream around the lap. Preserve original car-data speed samples and linearly interpolate X/Y by timestamp between the surrounding official position samples. Colour each adjacent X/Y segment by mean endpoint speed (km/h). Equal axis aspect. Require at least three finite speed/position samples and two usable continuous segments. Invalid/nonfinite/negative speed samples form gaps; intervals ≤0 or >2 seconds are not connected. The two-second rule is a conservative display-gap threshold, not a claim about FastF1's sampling frequency.
+**Calculation:** select one driver's fastest confirmed PB; do not silently choose a slower lap if its telemetry fails. To avoid materialising full-field telemetry on small hosted instances, scan both compressed streams, retaining only that driver's required channels. A timing-only FastF1 load has no absolute LapStartDate. In that case compute the maximum raw sample Date minus packet Time across both streams, round the offset to milliseconds, and add the preserved LapStartTime. This follows FastF1 3.8.3 `_calculate_t0_date`; sample dates are then rounded to milliseconds as in `_load_telemetry`. The offset scan covers the whole stream (including other drivers' timestamp evidence), but full-field telemetry DataFrames are never built. Slice the selected driver's rows to the timed lap afterward. Preserve original car-data speed samples and linearly interpolate X/Y by timestamp between the surrounding official position samples. Colour each adjacent X/Y segment by mean endpoint speed (km/h). Equal axis aspect. Require at least three finite speed/position samples and two usable continuous segments. Invalid/nonfinite/negative speed samples form gaps; intervals ≤0 or >2 seconds are not connected. The two-second rule is a conservative display-gap threshold, not a claim about FastF1's sampling frequency.
 
-**Tutorial:** Speed Visualization on Track Map, with the same fastest-PB and segment-colouring concept. The hosted low-memory path does not call `Lap.get_telemetry()` and therefore does not add FastF1's extra merged channels such as driver-ahead/distance; they are irrelevant to this chart. X/Y interpolation is explicitly timestamp-based and limited to the selected lap. No geographic positioning/corner attribution, two-driver comparison, or lap-delta inference.
+**Tutorial:** Speed Visualization on Track Map, with the same fastest-PB and segment-colouring concept. The hosted low-memory path does not call `Lap.get_telemetry()` and therefore does not add FastF1's extra merged channels such as driver-ahead/distance; they are irrelevant to this chart. X/Y interpolation is explicitly timestamp-based and limited to the selected lap. The real-session comparison and interpolation differences are documented in `LOADING_VALIDATION.md`. The decoder still fetches the full raw response, so low retained memory is not a guarantee of low cold-download peak memory. No geographic positioning/corner attribution, two-driver comparison, or lap-delta inference.
 
 ## 8. Practice Compound Usage and Performance
 
@@ -97,3 +101,4 @@ The optional quick filter retains LapTime ≤ 1.07 × the minimum retained lap w
 ## Reference URLs
 
 The supplied PDFs correspond to https://docs.fastf1.dev/getting_started/installation.html, https://docs.fastf1.dev/getting_started/basics.html and the gallery examples under https://docs.fastf1.dev/gen_modules/examples_gallery/ . Exact PDF-to-feature mapping is retained in AUDIT.md. Installed FastF1 3.8.3 source was used to verify version-specific behaviour rather than assuming current online documentation is identical.
+

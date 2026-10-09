@@ -1,0 +1,90 @@
+{
+  "mode": "snapshot",
+  "source": "cached official data",
+  "python": "3.12.14",
+  "fastf1": "3.8.3",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "baseline_rss_mib": 156.5234375,
+  "stages": {
+    "2024-1-Practice 2": {
+      "rows": 511,
+      "unknown_deleted": 0,
+      "deleted": 0,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 511,
+        "InSelectedScope": 511,
+        "UnambiguousObservedLaps": 511,
+        "ValidTimedLaps": 430,
+        "AccurateNonPitLaps": 350,
+        "BeforeQuickCutoff": 350,
+        "RepresentativeLaps": 198
+      },
+      "peak_rss_mib": 165.7890625,
+      "rss_mib": 166.00390625,
+      "after_render_peak_rss_mib": 215.4140625
+    },
+    "2024-1-Qualifying": {
+      "rows": 267,
+      "unknown_deleted": 0,
+      "deleted": 2,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 267,
+        "InSelectedScope": 267,
+        "UnambiguousObservedLaps": 267,
+        "ValidTimedLaps": 167,
+        "AccurateNonPitLaps": 83,
+        "BeforeQuickCutoff": 83,
+        "RepresentativeLaps": 83
+      },
+      "peak_rss_mib": 215.4140625,
+      "rss_mib": 212.7109375,
+      "after_render_peak_rss_mib": 259.28125
+    },
+    "2024-1-Race": {
+      "rows": 1129,
+      "unknown_deleted": 0,
+      "deleted": 20,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 1129,
+        "InSelectedScope": 1129,
+        "UnambiguousObservedLaps": 1129,
+        "ValidTimedLaps": 1087,
+        "AccurateNonPitLaps": 1005,
+        "BeforeQuickCutoff": 988,
+        "RepresentativeLaps": 988
+      },
+      "peak_rss_mib": 259.28125,
+      "rss_mib": 216.73828125,
+      "after_render_peak_rss_mib": 263.140625
+    },
+    "2024-5-Sprint": {
+      "rows": 378,
+      "unknown_deleted": 0,
+      "deleted": 3,
+      "lap_start_dates": 0,
+      "retention": {
+        "SourceRows": 378,
+        "InSelectedScope": 378,
+        "UnambiguousObservedLaps": 378,
+        "ValidTimedLaps": 355,
+        "AccurateNonPitLaps": 353,
+        "BeforeQuickCutoff": 353,
+        "RepresentativeLaps": 353
+      },
+      "peak_rss_mib": 263.140625,
+      "rss_mib": 215.9140625,
+      "after_render_peak_rss_mib": 263.140625
+    }
+  },
+  "telemetry": {
+    "samples": 345,
+    "lap": 16,
+    "seconds": 89.179,
+    "peak_rss_mib": 263.140625,
+    "after_render_peak_rss_mib": 263.140625
+  },
+  "peak_rss_mib": 263.140625
+}
